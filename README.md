@@ -19,7 +19,7 @@ Created by **Luis Alfredo Velasquez Duran** | Germany, 2025
 
 ## 🎯 What is PGA?
 
-**PGA (Prompts Genómicos Autoevolutivos)** is the world's first system that applies biological evolution principles to prompt engineering. Your AI agents don't just run prompts — they **evolve them automatically**.
+**PGA (Genomic Self-Evolving Prompts)** is the world's first system that applies biological evolution principles to prompt engineering. Your AI agents don't just run prompts — they **evolve them automatically**.
 
 ### The Problem
 
