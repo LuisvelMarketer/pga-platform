@@ -38,6 +38,11 @@ PGA Platform is protected by **3 patent applications**:
 📄 See [LICENSE.md](./LICENSE.md) for complete licensing details
 📄 See [PATENTS.md](./PATENTS.md) for patent documentation and prior art
 
+**📂 Ready-to-File IP Documents**: Complete patent and trademark applications in [`ip-filings/`](./ip-filings/)
+- 3 Patent applications (34 claims, ~108 pages)
+- 4 Trademark applications (US & EU)
+- Master filing guide with timelines and costs
+
 ---
 
 ## 🎯 What is PGA?
