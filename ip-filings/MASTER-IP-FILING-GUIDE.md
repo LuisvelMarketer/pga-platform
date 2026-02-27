@@ -1,4 +1,4 @@
-# 🛡️ MASTER IP FILING GUIDE - PGA PLATFORM
+ # 🛡️ MASTER IP FILING GUIDE - PGA PLATFORM
 
 **Complete Guide to Patent & Trademark Protection**
 
