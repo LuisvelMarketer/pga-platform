@@ -91,6 +91,16 @@ export type {
     StreamOptions,
 } from './realtime/StreamingManager.js';
 
+// ─── Plugins ────────────────────────────────────────────
+
+export { PluginManager } from './plugins/PluginManager.js';
+export type {
+    Plugin,
+    PluginMetadata,
+    PluginHooks,
+    PluginConfig,
+} from './plugins/PluginManager.js';
+
 // ─── Interfaces ─────────────────────────────────────────
 
 export type { LLMAdapter, Message, ChatOptions, ChatResponse, ChatChunk } from './interfaces/LLMAdapter.js';
