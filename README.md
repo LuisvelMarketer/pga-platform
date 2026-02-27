@@ -9,11 +9,34 @@
 
 **World's First Genomic Self-Evolving Prompts System**
 
-Created by **Luis Alfredo Velasquez Duran** | Germany, 2025
+Created by **Luis Alfredo Velasquez Duran** | Germany, 2025-2026
 
 [Documentation](https://docs.pga.ai) • [Examples](./examples) • [Marketplace](https://marketplace.pga.ai) • [Discord](https://discord.gg/pga)
 
 </div>
+
+---
+
+## 🛡️ Intellectual Property Protection
+
+**Patent Status**: Patent Pending 🔒
+
+PGA Platform is protected by **3 patent applications**:
+- 🇺🇸 **US Patent Application**: Genomic Prompt Evolution Method
+- 🇪🇺 **EU Patent Application**: Cross-Agent Genetic Inheritance System
+- 🌍 **International PCT**: Three-Layer Immutable Architecture
+
+**Copyright**: © 2025-2026 Luis Alfredo Velasquez Duran. All Rights Reserved.
+
+**Trademark**: "PGA™", "Genomic Self-Evolving Prompts™", and "Living OS for AI Agents™" are trademarks of Luis Alfredo Velasquez Duran (filing in progress).
+
+**License Structure**:
+- ✅ **Open Source** (MIT): Core engine, adapters, CLI — Free forever
+- 🔐 **BSL 1.1**: Gene Registry — Converts to Apache 2.0 in 2029
+- 🏢 **Proprietary**: PGA Cloud, Enterprise features — Commercial license
+
+📄 See [LICENSE.md](./LICENSE.md) for complete licensing details
+📄 See [PATENTS.md](./PATENTS.md) for patent documentation and prior art
 
 ---
 

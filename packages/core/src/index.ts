@@ -125,6 +125,46 @@ export type {
     RetryConfig,
 } from './resilience/RetryManager.js';
 
+// ─── Evolution (Living OS) ──────────────────────────────
+
+export { GenomeKernel, IntegrityViolationError, QuarantinedGenomeError } from './core/GenomeKernel.js';
+export type { GenomeKernelOptions } from './core/GenomeKernel.js';
+
+export { DriftAnalyzer } from './evolution/DriftAnalyzer.js';
+export type {
+    DriftAnalyzerConfig,
+    DriftSignal,
+    DriftType,
+    DriftSeverity,
+    DriftAnalysis,
+} from './evolution/DriftAnalyzer.js';
+
+export {
+    MutationEngine,
+    CompressInstructionsOperator,
+    ReorderConstraintsOperator,
+    SafetyReinforcementOperator,
+    ToolSelectionBiasOperator,
+} from './evolution/MutationOperator.js';
+export type {
+    IMutationOperator,
+    MutationContext,
+    MutationResult,
+} from './evolution/MutationOperator.js';
+
+export { FitnessCalculator } from './evolution/FitnessCalculator.js';
+export type {
+    InteractionData,
+    FitnessCalculatorConfig,
+} from './evolution/FitnessCalculator.js';
+
+export { PromotionGate } from './evolution/PromotionGate.js';
+export type {
+    PromotionGateConfig,
+    PromotionDecision,
+    PromotionCheck,
+} from './evolution/PromotionGate.js';
+
 // ─── Interfaces ─────────────────────────────────────────
 
 export type { LLMAdapter, Message, ChatOptions, ChatResponse, ChatChunk } from './interfaces/LLMAdapter.js';
@@ -149,8 +189,40 @@ export type {
     Sentiment,
 } from './types/index.js';
 
+// ─── Types v2 (Living OS) ───────────────────────────────
+
+export type {
+    GenomeV2,
+    Chromosome0,
+    Chromosome1,
+    Chromosome2,
+    OperativeGene,
+    GeneCategory,
+    GeneOrigin,
+    UserEpigenome,
+    UserPreferences,
+    LearnedPatterns,
+    ContextGene,
+    IntegrityMetadata,
+    LineageMetadata,
+    InheritedGene,
+    MutationRecord,
+    MutationTrigger,
+    MutationType,
+    FitnessVector,
+    FitnessWeights,
+    GenomeState,
+    ValidationResults,
+    EvaluationResult as EvaluationResultV2,
+    TaskResult,
+    GenomeSnapshot,
+    GenomeDiff,
+    GenomeChange,
+    GenomeFamily,
+} from './types/GenomeV2.js';
+
 // ─── Version ────────────────────────────────────────────
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export const AUTHOR = 'Luis Alfredo Velasquez Duran';
 export const YEAR = 2025;
