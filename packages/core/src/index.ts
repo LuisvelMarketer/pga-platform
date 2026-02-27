@@ -51,6 +51,25 @@ export type {
     MetricsCollectorConfig,
 } from './monitoring/MetricsCollector.js';
 
+// ─── Enterprise ─────────────────────────────────────────
+
+export { RateLimiter } from './enterprise/RateLimiter.js';
+export type {
+    RateLimitConfig,
+    RateLimitContext,
+    RateLimitResult,
+} from './enterprise/RateLimiter.js';
+
+export { AuthManager } from './enterprise/AuthManager.js';
+export type {
+    User,
+    Role,
+    Permission,
+    AuthContext,
+    AuthPolicy,
+    AuthConfig,
+} from './enterprise/AuthManager.js';
+
 // ─── Interfaces ─────────────────────────────────────────
 
 export type { LLMAdapter, Message, ChatOptions, ChatResponse, ChatChunk } from './interfaces/LLMAdapter.js';
