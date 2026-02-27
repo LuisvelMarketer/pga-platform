@@ -14,6 +14,9 @@ import { GenomeManager } from './core/GenomeManager.js';
 import { PromptAssembler } from './core/PromptAssembler.js';
 import { DNAProfile } from './core/DNAProfile.js';
 import { FitnessTracker } from './core/FitnessTracker.js';
+import { LearningAnnouncer } from './core/LearningAnnouncer.js';
+import { ContextMemory } from './core/ContextMemory.js';
+import { ProactiveSuggestions } from './core/ProactiveSuggestions.js';
 
 export interface PGAConfig {
     /**
@@ -114,6 +117,9 @@ export class PGA {
 export class GenomeInstance {
     private assembler: PromptAssembler;
     private dnaProfile: DNAProfile;
+    private learningAnnouncer: LearningAnnouncer;
+    private contextMemory: ContextMemory;
+    private proactiveSuggestions: ProactiveSuggestions;
 
     constructor(
         private genome: Genome,
@@ -122,6 +128,9 @@ export class GenomeInstance {
     ) {
         this.assembler = new PromptAssembler(storage, genome);
         this.dnaProfile = new DNAProfile(storage);
+        this.learningAnnouncer = new LearningAnnouncer();
+        this.contextMemory = new ContextMemory(storage);
+        this.proactiveSuggestions = new ProactiveSuggestions(storage);
         // FitnessTracker will be used in future for performance tracking
         new FitnessTracker(storage, genome);
     }
@@ -247,15 +256,16 @@ Ready to see what we can do together? 😊`,
     /**
      * Assemble optimized prompt for current context
      */
-    async assemblePrompt(context: SelectionContext): Promise<string> {
-        return this.assembler.assemblePrompt(context);
+    async assemblePrompt(context: SelectionContext, currentMessage?: string): Promise<string> {
+        return this.assembler.assemblePrompt(context, currentMessage);
     }
 
     /**
-     * Chat with PGA optimization
+     * Chat with PGA optimization + Intelligence Boost
      */
     async chat(userMessage: string, context: SelectionContext): Promise<string> {
-        const prompt = await this.assemblePrompt(context);
+        // Assemble prompt with intelligence boost (memory + proactive suggestions)
+        const prompt = await this.assemblePrompt(context, userMessage);
 
         const response = await this.llm.chat(
             [
@@ -263,6 +273,35 @@ Ready to see what we can do together? 😊`,
                 { role: 'user', content: userMessage },
             ],
         );
+
+        // If userId provided, enable intelligence features
+        if (context.userId) {
+            // Get previous DNA for learning detection
+            const previousDNA = await this.dnaProfile.getDNA(context.userId, this.genome.id);
+
+            // Update DNA and detect learning
+            await this.recordInteraction({
+                userId: context.userId,
+                userMessage,
+                assistantResponse: response.content,
+                toolCalls: [],
+                timestamp: new Date(),
+            });
+
+            // Get updated DNA
+            const updatedDNA = await this.dnaProfile.getDNA(context.userId, this.genome.id);
+
+            // Detect learning events
+            const learningEvents = this.learningAnnouncer.detectLearning(previousDNA, updatedDNA);
+
+            // If significant learning happened, announce it
+            if (learningEvents.length > 0 && learningEvents[0].confidence > 0.7) {
+                const announcement = this.learningAnnouncer.formatLearningAnnouncement(learningEvents);
+                if (announcement) {
+                    return response.content + '\n\n' + announcement;
+                }
+            }
+        }
 
         return response.content;
     }
@@ -334,5 +373,41 @@ Ready to see what we can do together? 😊`,
      */
     async export(): Promise<Genome> {
         return this.genome;
+    }
+
+    /**
+     * Get learning summary for user transparency
+     */
+    async getLearningSummary(userId: string): Promise<string> {
+        const dna = await this.dnaProfile.getDNA(userId, this.genome.id);
+        const interactions = await this.storage.getRecentInteractions?.(this.genome.id, userId, 50) || [];
+
+        // Get recent learning events (last 10 interactions)
+        const recentEvents = [];
+        for (let i = 1; i < Math.min(interactions.length, 10); i++) {
+            const prevDNA = await this.dnaProfile.getDNA(userId, this.genome.id);
+            const events = this.learningAnnouncer.detectLearning(prevDNA, dna);
+            recentEvents.push(...events);
+        }
+
+        return this.learningAnnouncer.generateLearningSummary(dna, recentEvents);
+    }
+
+    /**
+     * Get proactive suggestions for current context
+     */
+    async getProactiveSuggestions(userId: string, currentMessage: string) {
+        return this.proactiveSuggestions.generateSuggestions(
+            userId,
+            this.genome.id,
+            currentMessage,
+        );
+    }
+
+    /**
+     * Get conversation context/memory
+     */
+    async getConversationContext(userId: string) {
+        return this.contextMemory.buildContext(userId, this.genome.id);
     }
 }

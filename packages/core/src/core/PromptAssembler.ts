@@ -8,17 +8,25 @@
 
 import type { StorageAdapter } from '../interfaces/StorageAdapter.js';
 import type { Genome, SelectionContext } from '../types/index.js';
+import { ContextMemory } from './ContextMemory.js';
+import { ProactiveSuggestions } from './ProactiveSuggestions.js';
 
 export class PromptAssembler {
+    private contextMemory: ContextMemory;
+    private proactiveSuggestions: ProactiveSuggestions;
+
     constructor(
-        _storage: StorageAdapter,
+        storage: StorageAdapter,
         private genome: Genome,
-    ) {}
+    ) {
+        this.contextMemory = new ContextMemory(storage);
+        this.proactiveSuggestions = new ProactiveSuggestions(storage);
+    }
 
     /**
-     * Assemble full prompt from all three layers
+     * Assemble full prompt from all three layers + intelligence boost
      */
-    async assemblePrompt(context?: SelectionContext): Promise<string> {
+    async assemblePrompt(context?: SelectionContext, currentMessage?: string): Promise<string> {
         const sections: string[] = [];
 
         // Layer 0: Immutable DNA (security, core identity, ethics)
@@ -35,6 +43,32 @@ export class PromptAssembler {
         // Layer 2: Epigenomes (user preferences, communication style, etc.)
         const layer2Content = await this.selectBestFromLayer(2, context);
         sections.push(...layer2Content);
+
+        // 🧠 INTELLIGENCE BOOST: Add context memory (if user provided)
+        if (context?.userId) {
+            const memoryPrompt = await this.contextMemory.getMemoryPrompt(
+                context.userId,
+                this.genome.id,
+            );
+            if (memoryPrompt) {
+                sections.push(memoryPrompt);
+            }
+
+            // 🚀 PROACTIVE SUGGESTIONS: Add intelligent suggestions
+            if (currentMessage) {
+                const suggestions = await this.proactiveSuggestions.generateSuggestions(
+                    context.userId,
+                    this.genome.id,
+                    currentMessage,
+                );
+
+                if (suggestions.length > 0) {
+                    const suggestionsPrompt =
+                        this.proactiveSuggestions.formatSuggestionsPrompt(suggestions);
+                    sections.push(suggestionsPrompt);
+                }
+            }
+        }
 
         return sections.join('\n\n---\n\n');
     }
