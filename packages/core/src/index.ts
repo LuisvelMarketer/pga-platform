@@ -36,7 +36,37 @@ export type {
     EvaluationResult,
     BenchmarkResult,
     ComparisonResult,
+    EvaluatableGenome,
 } from './evaluation/Evaluator.js';
+
+export {
+    getBenchmarkSuite,
+    getAvailableSuites,
+    validateSuiteFrozen,
+    CORE_GENERAL_V1,
+    CORE_CODING_V1,
+    PGA_SPECIFIC_V1,
+} from './evaluation/BenchmarkSuites.js';
+export type {
+    BenchmarkSuite,
+    BenchmarkSuiteMetadata,
+    BenchmarkSuiteId,
+} from './evaluation/BenchmarkSuites.js';
+
+export {
+    getSandboxSuite,
+    getSandboxPromotionThreshold,
+    GLOBAL_SANDBOX_CASES,
+    COMPRESS_INSTRUCTIONS_CASES,
+    REORDER_CONSTRAINTS_CASES,
+    SAFETY_REINFORCEMENT_CASES,
+    TOOL_SELECTION_BIAS_CASES,
+    CODING_TASK_CASES,
+    GENERAL_TASK_CASES,
+} from './evaluation/SandboxSuites.js';
+export type {
+    SandboxCaseDefinition,
+} from './evaluation/SandboxSuites.js';
 
 // ─── Monitoring ─────────────────────────────────────────
 
@@ -187,6 +217,7 @@ export type {
     Layer,
     MutationRate,
     Sentiment,
+    GeneRegistryEntry,
 } from './types/index.js';
 
 // ─── Types v2 (Living OS) ───────────────────────────────

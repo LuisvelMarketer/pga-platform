@@ -16,6 +16,15 @@ export interface Genome {
         layer1: GeneAllele[]; // Slow mutation
         layer2: GeneAllele[]; // Fast mutation
     };
+    // Living OS v1.0 - Lineage tracking
+    familyId?: string;
+    version?: number;
+    lineage?: {
+        parentVersion?: number;
+        mutationOps?: string[];
+        promotedBy?: string;
+    };
+    c0IntegrityHash?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -146,6 +155,28 @@ export interface SelectionContext {
     model?: string;
     taskType?: string;
     metadata?: Record<string, unknown>;
+}
+
+// ─── Gene Registry Types ────────────────────────────────
+
+export interface GeneRegistryEntry {
+    id: string;
+    familyId: string;
+    gene: string;
+    variant: string;
+    content: string;
+    layer: Layer;
+    fitness: number;
+    sampleCount: number;
+    successRate: number;
+    metadata: {
+        sourceGenomeId: string;
+        sourceVersion: number;
+        publishedBy: string;
+        description?: string;
+        tags?: string[];
+    };
+    createdAt: Date;
 }
 
 // ─── Export All ─────────────────────────────────────────

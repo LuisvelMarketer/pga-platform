@@ -9,11 +9,17 @@ CREATE TABLE IF NOT EXISTS pga_genomes (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     config JSONB NOT NULL DEFAULT '{}',
+    -- Living OS v1.0: Lineage tracking
+    family_id TEXT,
+    version INTEGER DEFAULT 1,
+    lineage JSONB DEFAULT '{}',
+    c0_hash TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_genomes_name ON pga_genomes(name);
+CREATE INDEX IF NOT EXISTS idx_genomes_family ON pga_genomes(family_id, version DESC);
 
 -- ═══════════════════════════════════════════════════════════
 -- LAYERS (Three-Layer Architecture)
@@ -73,7 +79,7 @@ CREATE TABLE IF NOT EXISTS pga_interactions (
     user_message TEXT NOT NULL,
     assistant_response TEXT NOT NULL,
     tool_calls JSONB DEFAULT '[]',
-    score NUMERIC(5,4) NOT NULL,
+    score NUMERIC(5,4),
     task_type TEXT,
     timestamp TIMESTAMPTZ DEFAULT NOW()
 );
@@ -133,3 +139,25 @@ CREATE TABLE IF NOT EXISTS pga_analytics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_analytics_genome ON pga_analytics(genome_id, snapshot_at DESC);
+
+-- ═══════════════════════════════════════════════════════════
+-- GENE REGISTRY (Cross-Genome Knowledge Inheritance)
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS pga_gene_registry (
+    id TEXT PRIMARY KEY,
+    family_id TEXT NOT NULL,
+    gene TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    content TEXT NOT NULL,
+    layer INTEGER NOT NULL CHECK (layer IN (0, 1, 2)),
+    fitness NUMERIC(5,4) NOT NULL,
+    sample_count INTEGER NOT NULL,
+    success_rate NUMERIC(5,4) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(family_id, gene, variant)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gene_registry_family ON pga_gene_registry(family_id, fitness DESC);
+CREATE INDEX IF NOT EXISTS idx_gene_registry_gene ON pga_gene_registry(family_id, gene, fitness DESC);

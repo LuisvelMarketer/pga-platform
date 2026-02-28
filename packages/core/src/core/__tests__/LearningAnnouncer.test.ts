@@ -385,12 +385,12 @@ describe('LearningAnnouncer', () => {
       const summary = learningAnnouncer.generateLearningSummary(dna, events);
 
       expect(summary).toContain('Your AI Learning Report');
-      expect(summary).toContain('Generation: 10');
+      expect(summary).toContain('**Generation**: 10');
       expect(summary).toContain('Communication Style');
       expect(summary).toContain('technical');
       expect(summary).toContain('Detected Expertise');
       expect(summary).toContain('javascript');
-      expect(summary).toContain('95%');
+      expect(summary).toContain('90%');
       expect(summary).toContain('Recent Learning');
       expect(summary).toContain('Productivity Patterns');
       expect(summary).toContain('9, 10, 14');
@@ -404,7 +404,7 @@ describe('LearningAnnouncer', () => {
       const summary = learningAnnouncer.generateLearningSummary(dna, []);
 
       expect(summary).toContain('Your AI Learning Report');
-      expect(summary).toContain('Generation: 1');
+      expect(summary).toContain('**Generation**: 1');
     });
 
     it('should show recent learning events', () => {

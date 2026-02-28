@@ -346,19 +346,300 @@ Ready to see what we can do together? 😊`,
     }
 
     /**
-     * Trigger mutation cycle manually
+     * Add allele dynamically to genome
+     *
+     * Living OS v1.0: Dynamic gene injection
      */
-    async mutate(options?: { userId?: string }): Promise<void> {
-        // TODO: Implement mutation triggering
-        console.log('Mutation cycle triggered for genome:', this.genome.id, options);
+    async addAllele(
+        layer: 0 | 1 | 2,
+        gene: string,
+        variant: string,
+        content: string,
+    ): Promise<void> {
+        const newAllele = {
+            gene,
+            variant,
+            content,
+            fitness: 0.5,
+            sampleCount: 0,
+            generation: 0,
+            status: 'active' as const,
+            createdAt: new Date(),
+        };
+
+        // Add to genome layers
+        this.genome.layers[`layer${layer}` as 'layer0' | 'layer1' | 'layer2'].push(newAllele);
+
+        // Save to storage
+        await this.storage.saveGenome(this.genome);
+
+        // Log mutation
+        await this.storage.logMutation({
+            genomeId: this.genome.id,
+            layer,
+            gene,
+            variant,
+            mutationType: 'user_feedback',
+            parentVariant: null,
+            deployed: true,
+            createdAt: new Date(),
+        });
     }
 
     /**
-     * Rollback to previous version
+     * Trigger advanced mutation cycle with operators
+     *
+     * Living OS v1.0: Controlled mutation with validation
      */
-    async rollback(options: { layer: 0 | 1 | 2; gene: string; variant: string }): Promise<void> {
-        // TODO: Implement rollback
-        console.log('Rollback requested:', options);
+    async mutate(options?: {
+        operators?: string[];
+        candidates?: number;
+        minImprovement?: number;
+        taskType?: string;
+    }): Promise<{
+        applied: boolean;
+        reason: string;
+        improvement?: number;
+    }> {
+        const opts = {
+            operators: options?.operators || ['compress_instructions', 'reorder_constraints'],
+            candidates: options?.candidates || 3,
+            minImprovement: options?.minImprovement || 0.05,
+            taskType: options?.taskType || 'general',
+        };
+
+        // TODO: Implement full mutation pipeline with operators
+        // Will use opts for: generating mutation candidates, evaluating with sandbox, selecting best
+        // For now, return a placeholder response
+        return {
+            applied: false,
+            reason: `Mutation pipeline under development (config: ${opts.candidates} candidates, ${opts.minImprovement} min improvement)`,
+        };
+    }
+
+    /**
+     * Rollback to previous allele version
+     *
+     * Living OS v1.0: Safe rollback with lineage tracking
+     */
+    async rollback(options: {
+        layer: 0 | 1 | 2;
+        gene: string;
+        variant: string;
+    }): Promise<void> {
+        const { layer, gene, variant } = options;
+        const layerKey = `layer${layer}` as 'layer0' | 'layer1' | 'layer2';
+        const alleles = this.genome.layers[layerKey];
+
+        // Find the allele
+        const allele = alleles.find(a => a.gene === gene && a.variant === variant);
+        if (!allele) {
+            throw new Error(`Allele not found: ${gene}:${variant}`);
+        }
+
+        // Find parent variant
+        if (!allele.parentVariant) {
+            throw new Error(`No parent variant to rollback to for ${gene}:${variant}`);
+        }
+
+        const parentAllele = alleles.find(a => a.gene === gene && a.variant === allele.parentVariant);
+        if (!parentAllele) {
+            throw new Error(`Parent variant not found: ${allele.parentVariant}`);
+        }
+
+        // Retire current variant
+        allele.status = 'retired';
+
+        // Reactivate parent
+        parentAllele.status = 'active';
+
+        // Update lineage
+        if (this.genome.lineage) {
+            this.genome.lineage.mutationOps = [
+                ...(this.genome.lineage.mutationOps || []),
+                'rollback',
+            ];
+        }
+
+        // Save
+        await this.storage.saveGenome(this.genome);
+
+        // Log rollback
+        await this.storage.logMutation({
+            genomeId: this.genome.id,
+            layer,
+            gene,
+            variant: parentAllele.variant,
+            mutationType: 'rollback',
+            parentVariant: allele.variant,
+            deployed: true,
+            reason: 'Manual rollback requested',
+            createdAt: new Date(),
+        });
+    }
+
+    /**
+     * Chat with metrics tracking
+     *
+     * Living OS v1.0: Returns response + performance metrics
+     */
+    async chatWithMetrics(userMessage: string, context: SelectionContext): Promise<{
+        content: string;
+        metrics: {
+            tokensUsed: number;
+            responseTime: number;
+            fitnessScore: number;
+        };
+    }> {
+        const startTime = Date.now();
+        const content = await this.chat(userMessage, context);
+        const endTime = Date.now();
+
+        const tokensUsed = Math.ceil((userMessage.length + content.length) / 4);
+        const responseTime = endTime - startTime;
+
+        // Get current fitness from analytics
+        const analytics = await this.storage.getAnalytics(this.genome.id);
+        const fitnessScore = analytics.userSatisfaction || 0.5;
+
+        return {
+            content,
+            metrics: {
+                tokensUsed,
+                responseTime,
+                fitnessScore,
+            },
+        };
+    }
+
+    /**
+     * Publish gene to registry for cross-genome inheritance
+     *
+     * Living OS v1.0: Share successful genes across family
+     */
+    async publishGeneToRegistry(
+        gene: string,
+        variant: string,
+        description?: string,
+    ): Promise<string> {
+        if (!this.genome.familyId) {
+            throw new Error('Genome must have familyId to publish to registry');
+        }
+
+        // Find the allele across all layers
+        let allele: typeof this.genome.layers.layer0[0] | undefined;
+        let layer: 0 | 1 | 2 = 0;
+
+        for (const [layerName, alleles] of Object.entries(this.genome.layers)) {
+            allele = alleles.find(a => a.gene === gene && a.variant === variant);
+            if (allele) {
+                layer = parseInt(layerName.replace('layer', '')) as 0 | 1 | 2;
+                break;
+            }
+        }
+
+        if (!allele) {
+            throw new Error(`Allele not found: ${gene}:${variant}`);
+        }
+
+        // Calculate success rate
+        const successRate = allele.fitness;
+
+        // Create registry entry ID
+        const registryId = `${this.genome.familyId}_${gene}_${variant}_${Date.now()}`;
+
+        // TODO: Save to gene registry table via storage adapter
+        // Will include: familyId, gene, variant, content, layer, fitness, successRate, metadata
+        // For now, log as mutation with special type
+        await this.storage.logMutation({
+            genomeId: this.genome.id,
+            layer,
+            gene,
+            variant,
+            mutationType: 'user_feedback', // Using this as placeholder
+            parentVariant: null,
+            deployed: true,
+            reason: `Published to registry: ${description || 'No description'} (fitness: ${successRate})`,
+            createdAt: new Date(),
+        });
+
+        return registryId;
+    }
+
+    /**
+     * Inherit gene from registry
+     *
+     * Living OS v1.0: Import successful genes from family registry
+     */
+    async inheritGeneFromRegistry(
+        familyId: string,
+        gene: string,
+        targetLayer?: 0 | 1 | 2,
+    ): Promise<void> {
+        if (this.genome.familyId && this.genome.familyId !== familyId) {
+            throw new Error(`Cannot inherit from different family: ${familyId}`);
+        }
+
+        // TODO: Query gene registry table for best variant of this gene
+        // Will filter by: familyId, gene, and optionally targetLayer
+        // Then call addAllele() with inherited content
+        // For now, throw error indicating feature under development
+        throw new Error(
+            `Gene Registry inheritance under development - ` +
+            `will inherit gene '${gene}' from family '${familyId}' to layer ${targetLayer ?? 'auto'}`
+        );
+    }
+
+    /**
+     * Get evolution health metrics
+     *
+     * Living OS v1.0: Monitor genome evolution status
+     */
+    async getEvolutionHealth(): Promise<{
+        status: 'healthy' | 'degraded' | 'critical';
+        metrics: {
+            avgFitness: number;
+            mutationRate: number;
+            stabilityScore: number;
+            generationCount: number;
+        };
+        warnings: string[];
+    }> {
+        const analytics = await this.storage.getAnalytics(this.genome.id);
+
+        // Calculate average fitness across all active alleles
+        const allAlleles = [
+            ...this.genome.layers.layer0,
+            ...this.genome.layers.layer1,
+            ...this.genome.layers.layer2,
+        ].filter(a => a.status === 'active');
+
+        const avgFitness = allAlleles.length > 0
+            ? allAlleles.reduce((sum, a) => sum + a.fitness, 0) / allAlleles.length
+            : 0.5;
+
+        const generationCount = Math.max(...allAlleles.map(a => a.generation || 0), 0);
+
+        const warnings: string[] = [];
+        if (avgFitness < 0.4) warnings.push('Low average fitness detected');
+        if (analytics.totalMutations > 100 && analytics.avgFitnessImprovement < 0.02) {
+            warnings.push('Mutation plateau detected');
+        }
+
+        const status: 'healthy' | 'degraded' | 'critical' =
+            avgFitness >= 0.6 ? 'healthy' :
+            avgFitness >= 0.4 ? 'degraded' : 'critical';
+
+        return {
+            status,
+            metrics: {
+                avgFitness,
+                mutationRate: analytics.totalMutations / Math.max(analytics.totalInteractions, 1),
+                stabilityScore: analytics.userSatisfaction || 0.5,
+                generationCount,
+            },
+            warnings,
+        };
     }
 
     /**

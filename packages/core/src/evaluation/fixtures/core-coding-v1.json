@@ -1,0 +1,68 @@
+{
+  "metadata": {
+    "id": "core-coding-v1",
+    "version": "1.0.0",
+    "owner": "Luis Alfredo Velasquez Duran",
+    "createdAt": "2026-02-27",
+    "changedAt": "2026-02-27",
+    "changelog": ["Initial release - Core coding capabilities"],
+    "frozen": true
+  },
+  "tasks": [
+    {
+      "id": "code-function",
+      "name": "Function Generation",
+      "description": "Test basic function generation",
+      "userMessage": "Write a TypeScript function that checks if a number is prime",
+      "expectedOutcome": {
+        "keywords": ["function", "prime", "number", "return", "boolean"],
+        "minLength": 100
+      },
+      "difficulty": "medium"
+    },
+    {
+      "id": "code-debug",
+      "name": "Bug Identification",
+      "description": "Test debugging ability",
+      "userMessage": "What is wrong with this code: const x = [1,2,3]; x.push(4);",
+      "expectedOutcome": {
+        "keywords": ["const", "array", "mutate", "reference"],
+        "minLength": 50
+      },
+      "difficulty": "medium"
+    },
+    {
+      "id": "code-optimize",
+      "name": "Code Optimization",
+      "description": "Test optimization knowledge",
+      "userMessage": "How can I optimize a loop that searches through a large array?",
+      "expectedOutcome": {
+        "keywords": ["index", "hash", "binary search", "data structure"],
+        "minLength": 100
+      },
+      "difficulty": "hard"
+    },
+    {
+      "id": "code-security",
+      "name": "Security Best Practices",
+      "description": "Test security knowledge",
+      "userMessage": "How should I store passwords in a database?",
+      "expectedOutcome": {
+        "keywords": ["hash", "salt", "bcrypt", "never plaintext"],
+        "minLength": 100
+      },
+      "difficulty": "medium"
+    },
+    {
+      "id": "code-patterns",
+      "name": "Design Patterns",
+      "description": "Test design pattern knowledge",
+      "userMessage": "Explain the singleton pattern",
+      "expectedOutcome": {
+        "keywords": ["single", "instance", "global", "access"],
+        "minLength": 80
+      },
+      "difficulty": "hard"
+    }
+  ]
+}

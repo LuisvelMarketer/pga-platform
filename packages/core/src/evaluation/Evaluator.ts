@@ -12,7 +12,23 @@
  * - User Satisfaction (feedback scores)
  */
 
-import type { GenomeInstance } from '../PGA.js';
+import type { BenchmarkSuiteId } from './BenchmarkSuites.js';
+import { getBenchmarkSuite } from './BenchmarkSuites.js';
+import type { SandboxCaseDefinition } from './SandboxSuites.js';
+
+/**
+ * Evaluatable Genome Interface
+ *
+ * Living OS v1.0 Week 5: Hardened contract for evaluation
+ * Allows mocking and testing without full GenomeInstance
+ */
+export interface EvaluatableGenome {
+    chat(userMessage: string, context: { userId?: string }): Promise<string>;
+    chatWithMetrics?(userMessage: string, context: { userId?: string }): Promise<{
+        content: string;
+        metrics: { tokensUsed: number; responseTime: number; fitnessScore: number };
+    }>;
+}
 
 export interface EvaluationTask {
     id: string;
@@ -65,9 +81,11 @@ export interface ComparisonResult {
 export class Evaluator {
     /**
      * Run evaluation suite on a genome
+     *
+     * Living OS v1.0 Week 5: Uses EvaluatableGenome interface for flexibility
      */
     async evaluate(
-        genome: GenomeInstance,
+        genome: EvaluatableGenome,
         tasks: EvaluationTask[],
         userId: string,
     ): Promise<BenchmarkResult> {
@@ -98,9 +116,11 @@ export class Evaluator {
 
     /**
      * Evaluate a single task
+     *
+     * Living OS v1.0 Week 5: Supports semantic validation checks
      */
     private async evaluateTask(
-        genome: GenomeInstance,
+        genome: EvaluatableGenome,
         task: EvaluationTask,
         userId: string,
     ): Promise<EvaluationResult> {
@@ -116,8 +136,20 @@ export class Evaluator {
             // Estimate tokens (rough approximation: 4 chars = 1 token)
             const tokensUsed = Math.ceil((task.userMessage.length + response.length) / 4);
 
-            // Evaluate success
-            const { success, failureReason } = this.checkSuccess(response, task.expectedOutcome);
+            // Evaluate success (keyword + length checks)
+            const basicChecks = this.checkSuccess(response, task.expectedOutcome);
+
+            // Add semantic validation if task has semantic checks
+            let semanticChecks: { success: boolean; failureReason?: string } = { success: true };
+            if ('semanticChecks' in task && task.semanticChecks) {
+                semanticChecks = this.checkSemanticValidation(
+                    response,
+                    task.semanticChecks as SandboxCaseDefinition['semanticChecks']
+                );
+            }
+
+            const success = basicChecks.success && semanticChecks.success;
+            const failureReason = basicChecks.failureReason || semanticChecks.failureReason;
 
             // Calculate quality score
             const qualityScore = this.calculateQuality(response, task);
@@ -202,6 +234,65 @@ export class Evaluator {
     }
 
     /**
+     * Check semantic validation
+     *
+     * Living OS v1.0 Week 5: Semantic checks beyond keyword matching
+     */
+    private checkSemanticValidation(
+        response: string,
+        checks?: SandboxCaseDefinition['semanticChecks'],
+    ): { success: boolean; failureReason?: string } {
+        if (!checks) return { success: true };
+
+        // Check: requires priority flow (clear ordering/sequencing)
+        if (checks.requiresPriorityFlow) {
+            const hasOrdering = /\b(first|then|next|finally|priority|before|after)\b/i.test(response);
+            if (!hasOrdering) {
+                return {
+                    success: false,
+                    failureReason: 'Semantic: Missing clear priority/ordering flow',
+                };
+            }
+        }
+
+        // Check: requires validation clause (error handling/validation)
+        if (checks.requiresValidationClause) {
+            const hasValidation = /\b(validate|check|ensure|verify|if|error|handle|confirm)\b/i.test(response);
+            if (!hasValidation) {
+                return {
+                    success: false,
+                    failureReason: 'Semantic: Missing validation/error handling clause',
+                };
+            }
+        }
+
+        // Check: requires deterministic tooling (concrete tools specified)
+        if (checks.requiresDeterministicTooling) {
+            const hasTools = /\b(use|tool|function|method|read|write|execute|run)\b/i.test(response);
+            if (!hasTools) {
+                return {
+                    success: false,
+                    failureReason: 'Semantic: Missing deterministic tool specification',
+                };
+            }
+        }
+
+        // Check: requires concise directive (not overly verbose)
+        if (checks.requiresConciseDirective) {
+            // Heuristic: concise = response length < 500 chars OR has clear bullet/numbered structure
+            const isConcise = response.length < 500 || /^\s*[-*\d]\./m.test(response);
+            if (!isConcise) {
+                return {
+                    success: false,
+                    failureReason: 'Semantic: Response not concise or well-structured',
+                };
+            }
+        }
+
+        return { success: true };
+    }
+
+    /**
      * Calculate quality score (0-1)
      */
     private calculateQuality(response: string, task: EvaluationTask): number {
@@ -228,11 +319,27 @@ export class Evaluator {
     }
 
     /**
+     * Compare genome against versioned benchmark suite
+     *
+     * Living OS v1.0 Week 5: Versioned suite comparison
+     */
+    async compareWithSuite(
+        genome: EvaluatableGenome,
+        suiteId: BenchmarkSuiteId,
+        userId: string,
+    ): Promise<BenchmarkResult> {
+        const suite = getBenchmarkSuite(suiteId);
+        return this.evaluate(genome, suite.tasks, userId);
+    }
+
+    /**
      * Compare PGA vs baseline (no PGA)
+     *
+     * Living OS v1.0 Week 5: Uses EvaluatableGenome interface
      */
     async compare(
-        genomeWithPGA: GenomeInstance,
-        genomeBaseline: GenomeInstance,
+        genomeWithPGA: EvaluatableGenome,
+        genomeBaseline: EvaluatableGenome,
         tasks: EvaluationTask[],
         userId: string,
     ): Promise<ComparisonResult> {
