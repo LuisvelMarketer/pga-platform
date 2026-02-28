@@ -1,0 +1,27 @@
+# PGA Platform Code Owners
+# 
+# Default owner for everything in the repo
+* @LuisvelMarketer
+
+# Core packages
+/packages/core/ @LuisvelMarketer
+/packages/core/src/types/ @LuisvelMarketer
+/packages/core/src/evaluation/ @LuisvelMarketer
+/packages/core/src/evolution/ @LuisvelMarketer
+
+# Adapters
+/packages/adapters-llm-anthropic/ @LuisvelMarketer
+/packages/adapters-llm-openai/ @LuisvelMarketer
+/packages/adapters-storage-postgres/ @LuisvelMarketer
+
+# Infrastructure and CI/CD
+/.github/ @LuisvelMarketer
+/.github/workflows/ @LuisvelMarketer
+/SECURITY.md @LuisvelMarketer
+/turbo.json @LuisvelMarketer
+
+# Documentation
+/README.md @LuisvelMarketer
+/CONTRIBUTING.md @LuisvelMarketer
+/CHANGELOG.md @LuisvelMarketer
+/docs/ @LuisvelMarketer
