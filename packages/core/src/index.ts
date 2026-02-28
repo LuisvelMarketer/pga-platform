@@ -79,6 +79,11 @@ export type {
     CalibrationHistory,
 } from './evaluation/CalibrationManager.js';
 
+export { EvolutionGuardrailsManager } from './evaluation/EvolutionGuardrails.js';
+export type {
+    MutationCandidate,
+} from './evaluation/EvolutionGuardrails.js';
+
 // ─── Monitoring ─────────────────────────────────────────
 
 export { MetricsCollector } from './monitoring/MetricsCollector.js';
@@ -229,6 +234,9 @@ export type {
     MutationRate,
     Sentiment,
     GeneRegistryEntry,
+    EvolutionGuardrails,
+    EconomicMetrics,
+    PromotionGateResult,
 } from './types/index.js';
 
 // ─── Types v2 (Living OS) ───────────────────────────────

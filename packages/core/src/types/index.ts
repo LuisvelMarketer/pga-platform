@@ -35,6 +35,31 @@ export interface GenomeConfig {
     epsilonExplore?: number;
     enableAutoML?: boolean;
     enableMultiModel?: boolean;
+    evolutionGuardrails?: EvolutionGuardrails;
+}
+
+/**
+ * Evolution Guardrails - Multi-gate promotion system
+ *
+ * Living OS v1.0 Must-Have: Economic + Quality + Sandbox gates
+ */
+export interface EvolutionGuardrails {
+    // Quality Gate
+    minQualityScore: number;        // Min fitness to promote (0-1)
+
+    // Sandbox Gate
+    minSandboxScore: number;        // Min sandbox pass rate (0-1)
+
+    // Economic Gate
+    minCompressionScore: number;    // Min tokens per success threshold (0-1)
+    maxCostPerTask: number;         // Max $ per successful task
+
+    // Stability Gate
+    minStabilityWindow: number;     // Min interactions before promotion
+    maxRollbackRate: number;        // Max acceptable rollback rate (0-1)
+
+    // Gate Logic
+    gateMode: 'AND' | 'OR';        // How to combine gates (default: AND)
 }
 
 export interface GeneAllele {
@@ -118,6 +143,23 @@ export interface MutationProposal {
     priority: 'low' | 'medium' | 'high' | 'critical';
 }
 
+/**
+ * Promotion Gate Result - Multi-gate validation
+ *
+ * Living OS v1.0 Must-Have: Track each gate separately
+ */
+export interface PromotionGateResult {
+    passed: boolean;
+    gates: {
+        quality: { passed: boolean; score: number; threshold: number };
+        sandbox: { passed: boolean; score: number; threshold: number };
+        economic: { passed: boolean; score: number; threshold: number };
+        stability: { passed: boolean; score: number; threshold: number };
+    };
+    finalDecision: 'promote' | 'reject' | 'canary';
+    reason: string;
+}
+
 // ─── Interaction Types ──────────────────────────────────
 
 export interface Interaction {
@@ -146,6 +188,28 @@ export interface FitnessMetrics {
     interventionRate: number;       // Autonomy
     executionPrecision: number;     // Reliability
     overall: number;                // Weighted average
+}
+
+/**
+ * Economic Metrics - Cost optimization tracking
+ *
+ * Living OS v1.0 Must-Have: Track $ per value
+ */
+export interface EconomicMetrics {
+    // Token efficiency
+    tokensPerSuccess: number;       // Avg tokens used per successful task
+    compressionScore: number;       // 0-1: Lower tokens = higher score
+
+    // Cost tracking
+    costPerTask: number;            // $ per task (based on model pricing)
+    costPerSuccess: number;         // $ per successful task
+
+    // Latency
+    avgLatencyMs: number;           // Average response time
+    p95LatencyMs: number;           // 95th percentile latency
+
+    // North Star
+    valuePerDollar: number;         // Successful outcomes / $
 }
 
 // ─── Selection Context ──────────────────────────────────
