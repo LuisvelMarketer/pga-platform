@@ -161,3 +161,28 @@ CREATE TABLE IF NOT EXISTS pga_gene_registry (
 
 CREATE INDEX IF NOT EXISTS idx_gene_registry_family ON pga_gene_registry(family_id, fitness DESC);
 CREATE INDEX IF NOT EXISTS idx_gene_registry_gene ON pga_gene_registry(family_id, gene, fitness DESC);
+
+-- ═══════════════════════════════════════════════════════════
+-- CALIBRATION HISTORY (Dynamic Threshold Tuning)
+-- Living OS v1.0 Final 10/10
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS pga_calibration_history (
+    id BIGSERIAL PRIMARY KEY,
+    context_key TEXT NOT NULL,
+    layer INTEGER CHECK (layer IN (0, 1, 2)),
+    operator TEXT,
+    task_type TEXT,
+    threshold NUMERIC(5,4) NOT NULL,
+    total_candidates INTEGER NOT NULL,
+    passed_sandbox INTEGER NOT NULL,
+    deployed_successfully INTEGER NOT NULL,
+    rolled_back INTEGER NOT NULL,
+    false_positive_rate NUMERIC(5,4) NOT NULL,
+    false_negative_rate NUMERIC(5,4) NOT NULL,
+    optimal_threshold NUMERIC(5,4) NOT NULL,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_calibration_context ON pga_calibration_history(context_key, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_calibration_layer ON pga_calibration_history(layer, timestamp DESC);

@@ -15,6 +15,8 @@
 import type { BenchmarkSuiteId } from './BenchmarkSuites.js';
 import { getBenchmarkSuite } from './BenchmarkSuites.js';
 import type { SandboxCaseDefinition } from './SandboxSuites.js';
+import { SemanticJudge } from './SemanticJudge.js';
+import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
 
 /**
  * Evaluatable Genome Interface
@@ -79,10 +81,19 @@ export interface ComparisonResult {
 }
 
 export class Evaluator {
+    private semanticJudge?: SemanticJudge;
+
+    constructor(options?: { llm?: LLMAdapter; enableSemanticJudge?: boolean }) {
+        if (options?.llm && options?.enableSemanticJudge !== false) {
+            this.semanticJudge = new SemanticJudge(options.llm);
+        }
+    }
+
     /**
      * Run evaluation suite on a genome
      *
      * Living OS v1.0 Week 5: Uses EvaluatableGenome interface for flexibility
+     * Living OS v1.0 Final 10/10: Optional semantic judge with LLM
      */
     async evaluate(
         genome: EvaluatableGenome,
@@ -142,10 +153,22 @@ export class Evaluator {
             // Add semantic validation if task has semantic checks
             let semanticChecks: { success: boolean; failureReason?: string } = { success: true };
             if ('semanticChecks' in task && task.semanticChecks) {
-                semanticChecks = this.checkSemanticValidation(
-                    response,
-                    task.semanticChecks as SandboxCaseDefinition['semanticChecks']
-                );
+                // Use deep semantic judge if available, otherwise fall back to heuristic
+                if (this.semanticJudge) {
+                    const judgment = await this.semanticJudge.judge(
+                        task as SandboxCaseDefinition,
+                        response
+                    );
+                    semanticChecks = {
+                        success: judgment.passed && judgment.confidence >= 0.7,
+                        failureReason: judgment.passed ? undefined : judgment.reasoning,
+                    };
+                } else {
+                    semanticChecks = this.checkSemanticValidation(
+                        response,
+                        task.semanticChecks as SandboxCaseDefinition['semanticChecks']
+                    );
+                }
             }
 
             const success = basicChecks.success && semanticChecks.success;

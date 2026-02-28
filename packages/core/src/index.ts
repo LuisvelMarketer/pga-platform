@@ -68,6 +68,17 @@ export type {
     SandboxCaseDefinition,
 } from './evaluation/SandboxSuites.js';
 
+export { SemanticJudge } from './evaluation/SemanticJudge.js';
+export type {
+    SemanticJudgment,
+} from './evaluation/SemanticJudge.js';
+
+export { CalibrationManager } from './evaluation/CalibrationManager.js';
+export type {
+    CalibrationPoint,
+    CalibrationHistory,
+} from './evaluation/CalibrationManager.js';
+
 // ─── Monitoring ─────────────────────────────────────────
 
 export { MetricsCollector } from './monitoring/MetricsCollector.js';
