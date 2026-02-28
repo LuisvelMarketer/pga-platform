@@ -219,7 +219,7 @@ export class ReorderConstraintsOperator implements IMutationOperator {
         };
     }
 
-    estimateImprovement(context: MutationContext): number {
+    estimateImprovement(_context: MutationContext): number {
         return 0.10; // Consistent 10% improvement
     }
 
@@ -368,7 +368,7 @@ export class ToolSelectionBiasOperator implements IMutationOperator {
         };
     }
 
-    estimateImprovement(context: MutationContext): number {
+    estimateImprovement(_context: MutationContext): number {
         return 0.12; // Consistent 12% improvement
     }
 

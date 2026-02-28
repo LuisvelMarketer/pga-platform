@@ -20,10 +20,6 @@ import * as crypto from 'crypto';
 import type {
     GenomeV2,
     Chromosome0,
-    IntegrityMetadata,
-    FitnessVector,
-    MutationRecord,
-    GenomeState,
     GenomeSnapshot,
 } from '../types/GenomeV2.js';
 

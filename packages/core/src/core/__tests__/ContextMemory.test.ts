@@ -2,7 +2,7 @@
  * ContextMemory Tests
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextMemory } from '../ContextMemory';
 import type { StorageAdapter } from '../../interfaces/StorageAdapter';
 

@@ -15,7 +15,7 @@
  * @version 2.0.0
  */
 
-import type { GenomeV2, FitnessVector, MutationRecord } from '../types/GenomeV2.js';
+import type { GenomeV2, MutationRecord } from '../types/GenomeV2.js';
 import { GenomeKernel } from '../core/GenomeKernel.js';
 import { FitnessCalculator } from './FitnessCalculator.js';
 

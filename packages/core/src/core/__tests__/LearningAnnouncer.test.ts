@@ -2,7 +2,7 @@
  * LearningAnnouncer Tests
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { LearningAnnouncer } from '../LearningAnnouncer';
 import type { UserDNA } from '../../types';
 

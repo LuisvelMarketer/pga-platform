@@ -2,7 +2,7 @@
  * ProactiveSuggestions Tests
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ProactiveSuggestions } from '../ProactiveSuggestions';
 import type { StorageAdapter } from '../../interfaces/StorageAdapter';
 import type { UserDNA } from '../../types';
