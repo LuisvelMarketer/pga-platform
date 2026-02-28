@@ -18,6 +18,7 @@ import { LearningAnnouncer } from './core/LearningAnnouncer.js';
 import { ContextMemory } from './core/ContextMemory.js';
 import { ProactiveSuggestions } from './core/ProactiveSuggestions.js';
 import { EvolutionGuardrailsManager } from './evaluation/EvolutionGuardrails.js';
+import { ModelRouter, type ModelRouterConfig } from './advanced-ai/ModelRouter.js';
 
 export interface PGAConfig {
     /**
@@ -34,6 +35,11 @@ export interface PGAConfig {
      * Optional genome configuration defaults
      */
     config?: Partial<GenomeConfig>;
+
+    /**
+     * Optional model router configuration
+     */
+    modelRouter?: ModelRouterConfig;
 }
 
 /**
@@ -94,7 +100,12 @@ export class PGA {
             },
         });
 
-        return new GenomeInstance(genome, this.llm, this.pgaConfig.storage);
+        return new GenomeInstance(
+            genome,
+            this.llm,
+            this.pgaConfig.storage,
+            this.pgaConfig.modelRouter,
+        );
     }
 
     /**
@@ -104,7 +115,12 @@ export class PGA {
         const genome = await this.genomeManager.loadGenome(genomeId);
         if (!genome) return null;
 
-        return new GenomeInstance(genome, this.llm, this.pgaConfig.storage);
+        return new GenomeInstance(
+            genome,
+            this.llm,
+            this.pgaConfig.storage,
+            this.pgaConfig.modelRouter,
+        );
     }
 
     /**
@@ -134,11 +150,13 @@ export class GenomeInstance {
     private contextMemory: ContextMemory;
     private proactiveSuggestions: ProactiveSuggestions;
     private guardrailsManager: EvolutionGuardrailsManager;
+    private modelRouter: ModelRouter;
 
     constructor(
         private genome: Genome,
         private llm: LLMAdapter,
         private storage: StorageAdapter,
+        modelRouterConfig?: ModelRouterConfig,
     ) {
         this.assembler = new PromptAssembler(storage, genome);
         this.dnaProfile = new DNAProfile(storage);
@@ -149,6 +167,7 @@ export class GenomeInstance {
             storage,
             genome.config.evolutionGuardrails,
         );
+        this.modelRouter = new ModelRouter(storage, modelRouterConfig);
         // FitnessTracker will be used in future for performance tracking
         new FitnessTracker(storage, genome);
     }
@@ -765,6 +784,28 @@ Ready to see what we can do together? 😊`,
      */
     updateGuardrails(updates: Partial<EvolutionGuardrails>): void {
         this.guardrailsManager.updateGuardrails(updates);
+    }
+
+    /**
+     * Get optimal model for task (Multi-Model Routing)
+     *
+     * Living OS v1.0 Must-Have: Cost optimization via intelligent routing
+     */
+    async getOptimalModel(userMessage: string, context?: string) {
+        return this.modelRouter.routeTask({
+            userMessage,
+            context,
+            genomeId: this.genome.id,
+        });
+    }
+
+    /**
+     * Get model routing analytics
+     *
+     * Living OS v1.0 Must-Have: Monitor routing performance
+     */
+    getRoutingAnalytics() {
+        return this.modelRouter.getRoutingAnalytics();
     }
 
     /**

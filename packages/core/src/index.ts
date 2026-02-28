@@ -157,6 +157,14 @@ export type {
     MetaLearning,
 } from './advanced-ai/ThinkingEngine.js';
 
+export { ModelRouter } from './advanced-ai/ModelRouter.js';
+export type {
+    ModelSpec,
+    TaskClassification,
+    RoutingDecision,
+    ModelRouterConfig,
+} from './advanced-ai/ModelRouter.js';
+
 // ─── Resilience ─────────────────────────────────────────
 
 export { CircuitBreaker } from './resilience/CircuitBreaker.js';
