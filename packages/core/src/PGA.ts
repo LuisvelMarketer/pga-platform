@@ -21,6 +21,8 @@ import { EvolutionGuardrailsManager } from './evaluation/EvolutionGuardrails.js'
 import { ModelRouter, type ModelRouterConfig } from './advanced-ai/ModelRouter.js';
 import { MetricsCollector, type MetricsCollectorConfig } from './monitoring/MetricsCollector.js';
 import { MonitoringDashboard, type DashboardConfig } from './monitoring/MonitoringDashboard.js';
+import { RAGEngine, type RAGConfig } from './rag/RAGEngine.js';
+import { ReasoningEngine, type ReasoningConfig } from './reasoning/ReasoningEngine.js';
 
 export interface PGAConfig {
     /**
@@ -52,6 +54,16 @@ export interface PGAConfig {
      * Optional dashboard configuration
      */
     dashboard?: DashboardConfig & { enabled?: boolean };
+
+    /**
+     * Optional RAG configuration (v0.3.0)
+     */
+    rag?: RAGConfig;
+
+    /**
+     * Optional Reasoning configuration (v0.3.0)
+     */
+    reasoning?: Partial<ReasoningConfig>;
 }
 
 /**
@@ -196,6 +208,8 @@ export class PGA {
             this.pgaConfig.storage,
             this.metricsCollector,
             this.pgaConfig.modelRouter,
+            this.pgaConfig.rag,
+            this.pgaConfig.reasoning,
         );
     }
 
@@ -212,6 +226,8 @@ export class PGA {
             this.pgaConfig.storage,
             this.metricsCollector,
             this.pgaConfig.modelRouter,
+            this.pgaConfig.rag,
+            this.pgaConfig.reasoning,
         );
     }
 
@@ -244,6 +260,8 @@ export class GenomeInstance {
     private guardrailsManager: EvolutionGuardrailsManager;
     private modelRouter: ModelRouter;
     private metrics: MetricsCollector;
+    private ragEngine?: RAGEngine;
+    private reasoningEngine?: ReasoningEngine;
 
     constructor(
         private genome: Genome,
@@ -251,11 +269,20 @@ export class GenomeInstance {
         private storage: StorageAdapter,
         metrics: MetricsCollector,
         modelRouterConfig?: ModelRouterConfig,
+        ragConfig?: RAGConfig,
+        reasoningConfig?: Partial<ReasoningConfig>,
     ) {
         this.assembler = new PromptAssembler(storage, genome);
         this.dnaProfile = new DNAProfile(storage);
         this.learningAnnouncer = new LearningAnnouncer();
-        this.contextMemory = new ContextMemory(storage);
+
+        // Initialize ContextMemory with LayeredMemory support
+        this.contextMemory = new ContextMemory(
+            storage,
+            llm, // Enable LayeredMemory
+            genome.config.layeredMemory
+        );
+
         this.proactiveSuggestions = new ProactiveSuggestions(storage);
         this.guardrailsManager = new EvolutionGuardrailsManager(
             storage,
@@ -263,6 +290,17 @@ export class GenomeInstance {
         );
         this.modelRouter = new ModelRouter(storage, modelRouterConfig);
         this.metrics = metrics;
+
+        // Initialize RAG Engine if configured
+        if (ragConfig && genome.config.rag?.enabled) {
+            this.ragEngine = new RAGEngine(llm, ragConfig);
+        }
+
+        // Initialize Reasoning Engine if configured
+        if (genome.config.reasoning?.enabled) {
+            this.reasoningEngine = new ReasoningEngine(llm, reasoningConfig);
+        }
+
         // FitnessTracker will be used in future for performance tracking
         new FitnessTracker(storage, genome);
     }
@@ -402,14 +440,32 @@ Ready to see what we can do together? 😊`,
 
         try {
             // Assemble prompt with intelligence boost (memory + proactive suggestions)
-            const prompt = await this.assemblePrompt(context, userMessage);
+            let prompt = await this.assemblePrompt(context, userMessage);
 
-            const response = await this.llm.chat(
-                [
-                    { role: 'system', content: prompt },
-                    { role: 'user', content: userMessage },
-                ],
-            );
+            // Augment with RAG if enabled
+            if (this.ragEngine) {
+                const ragContext = await this.ragEngine.augment(userMessage, prompt);
+                prompt = ragContext.augmentedPrompt;
+            }
+
+            // Use Reasoning if enabled
+            let response: { content: string };
+            if (this.reasoningEngine) {
+                const reasoningResult = await this.reasoningEngine.reason(
+                    userMessage,
+                    prompt,
+                    this.genome.config.reasoning?.defaultStrategy
+                );
+                response = { content: reasoningResult.answer };
+            } else {
+                // Standard LLM chat
+                response = await this.llm.chat(
+                    [
+                        { role: 'system', content: prompt },
+                        { role: 'user', content: userMessage },
+                    ],
+                );
+            }
 
             // Calculate tokens (rough estimate)
             const inputTokens = Math.ceil((prompt.length + userMessage.length) / 4);

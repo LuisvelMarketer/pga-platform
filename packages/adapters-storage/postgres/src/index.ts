@@ -12,6 +12,7 @@ import type {
     UserDNA,
     Interaction,
     MutationLog,
+    SemanticFact,
 } from '@pga/core';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -508,6 +509,168 @@ export class PostgresAdapter implements StorageAdapter {
                 fitness: parseFloat(row.fitness || '0'),
             })),
         };
+    }
+
+    // ─── Semantic Facts (Layered Memory) ──────────────────────
+
+    /**
+     * Save semantic fact
+     */
+    async saveFact(fact: SemanticFact, userId: string, genomeId: string): Promise<void> {
+        await this.pool.query(
+            `INSERT INTO semantic_facts (
+                id, user_id, genome_id, fact, category, confidence,
+                source_turn, source_interaction_id, extracted_at,
+                expiry, verified
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (id) DO UPDATE SET
+                fact = $4,
+                category = $5,
+                confidence = $6,
+                verified = $11,
+                expiry = $10,
+                updated_at = NOW()`,
+            [
+                fact.id,
+                userId,
+                genomeId,
+                fact.fact,
+                fact.category,
+                fact.confidence,
+                fact.sourceTurn,
+                fact.sourceInteractionId,
+                fact.extractedAt,
+                fact.expiry,
+                fact.verified,
+            ],
+        );
+    }
+
+    /**
+     * Get all facts for a user/genome
+     */
+    async getFacts(userId: string, genomeId: string, includeExpired: boolean = false): Promise<SemanticFact[]> {
+        const query = includeExpired
+            ? `SELECT * FROM semantic_facts
+               WHERE user_id = $1 AND genome_id = $2
+               ORDER BY verified DESC, confidence DESC, extracted_at DESC`
+            : `SELECT * FROM semantic_facts
+               WHERE user_id = $1 AND genome_id = $2
+               AND (expiry IS NULL OR expiry > NOW())
+               ORDER BY verified DESC, confidence DESC, extracted_at DESC`;
+
+        const result = await this.pool.query(query, [userId, genomeId]);
+
+        return result.rows.map((row) => ({
+            id: row.id,
+            fact: row.fact,
+            category: row.category,
+            confidence: parseFloat(row.confidence),
+            sourceTurn: row.source_turn,
+            sourceInteractionId: row.source_interaction_id,
+            extractedAt: row.extracted_at,
+            expiry: row.expiry,
+            verified: row.verified,
+        }));
+    }
+
+    /**
+     * Get specific fact by ID
+     */
+    async getFact(factId: string): Promise<SemanticFact | null> {
+        const result = await this.pool.query(
+            'SELECT * FROM semantic_facts WHERE id = $1',
+            [factId],
+        );
+
+        if (result.rows.length === 0) {
+            return null;
+        }
+
+        const row = result.rows[0];
+        return {
+            id: row.id,
+            fact: row.fact,
+            category: row.category,
+            confidence: parseFloat(row.confidence),
+            sourceTurn: row.source_turn,
+            sourceInteractionId: row.source_interaction_id,
+            extractedAt: row.extracted_at,
+            expiry: row.expiry,
+            verified: row.verified,
+        };
+    }
+
+    /**
+     * Update existing fact
+     */
+    async updateFact(factId: string, updates: Partial<SemanticFact>): Promise<void> {
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        if (updates.fact !== undefined) {
+            setClauses.push(`fact = $${paramIndex++}`);
+            values.push(updates.fact);
+        }
+        if (updates.category !== undefined) {
+            setClauses.push(`category = $${paramIndex++}`);
+            values.push(updates.category);
+        }
+        if (updates.confidence !== undefined) {
+            setClauses.push(`confidence = $${paramIndex++}`);
+            values.push(updates.confidence);
+        }
+        if (updates.verified !== undefined) {
+            setClauses.push(`verified = $${paramIndex++}`);
+            values.push(updates.verified);
+        }
+        if (updates.expiry !== undefined) {
+            setClauses.push(`expiry = $${paramIndex++}`);
+            values.push(updates.expiry);
+        }
+
+        if (setClauses.length === 0) {
+            return; // Nothing to update
+        }
+
+        setClauses.push(`updated_at = NOW()`);
+        values.push(factId);
+
+        const query = `UPDATE semantic_facts SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`;
+        await this.pool.query(query, values);
+    }
+
+    /**
+     * Delete specific fact
+     */
+    async deleteFact(factId: string): Promise<void> {
+        await this.pool.query('DELETE FROM semantic_facts WHERE id = $1', [factId]);
+    }
+
+    /**
+     * Delete all facts for a user/genome
+     */
+    async deleteUserFacts(userId: string, genomeId: string): Promise<void> {
+        await this.pool.query(
+            'DELETE FROM semantic_facts WHERE user_id = $1 AND genome_id = $2',
+            [userId, genomeId],
+        );
+    }
+
+    /**
+     * Clean expired facts (returns count of deleted facts)
+     */
+    async cleanExpiredFacts(userId: string, genomeId: string): Promise<number> {
+        const result = await this.pool.query(
+            `DELETE FROM semantic_facts
+             WHERE user_id = $1 AND genome_id = $2
+             AND expiry IS NOT NULL AND expiry <= NOW()
+             RETURNING id`,
+            [userId, genomeId],
+        );
+
+        return result.rowCount || 0;
     }
 
     /**

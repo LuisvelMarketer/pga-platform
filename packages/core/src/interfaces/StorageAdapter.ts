@@ -8,6 +8,7 @@
  */
 
 import type { Genome, UserDNA, MutationLog } from '../types/index.js';
+import type { SemanticFact } from '../memory/LayeredMemory.js';
 
 /**
  * Storage Adapter Interface
@@ -104,4 +105,41 @@ export interface StorageAdapter {
         userSatisfaction: number;
         topGenes: Array<{ gene: string; fitness: number }>;
     }>;
+
+    // ─── Semantic Facts (Layered Memory) ────────────────────
+
+    /**
+     * Save semantic fact
+     */
+    saveFact(fact: SemanticFact, userId: string, genomeId: string): Promise<void>;
+
+    /**
+     * Get all facts for a user/genome
+     */
+    getFacts(userId: string, genomeId: string, includeExpired?: boolean): Promise<SemanticFact[]>;
+
+    /**
+     * Get specific fact by ID
+     */
+    getFact(factId: string): Promise<SemanticFact | null>;
+
+    /**
+     * Update existing fact
+     */
+    updateFact(factId: string, updates: Partial<SemanticFact>): Promise<void>;
+
+    /**
+     * Delete specific fact
+     */
+    deleteFact(factId: string): Promise<void>;
+
+    /**
+     * Delete all facts for a user/genome
+     */
+    deleteUserFacts(userId: string, genomeId: string): Promise<void>;
+
+    /**
+     * Clean expired facts (returns count of deleted facts)
+     */
+    cleanExpiredFacts(userId: string, genomeId: string): Promise<number>;
 }

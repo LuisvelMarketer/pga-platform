@@ -102,6 +102,50 @@ export type {
     DashboardConfig,
 } from './monitoring/MonitoringDashboard.js';
 
+export { AlertWebhooks } from './monitoring/AlertWebhooks.js';
+export type {
+    WebhookConfig,
+    SlackPayload,
+    DiscordPayload,
+} from './monitoring/AlertWebhooks.js';
+
+// ─── Memory (v0.3.0) ────────────────────────────────────
+
+export { LayeredMemory } from './memory/LayeredMemory.js';
+export type {
+    LayeredMemoryConfig,
+    LayeredMemorySnapshot,
+    ShortTermMemory,
+    MediumTermMemory,
+    LongTermMemory,
+    UserProfile,
+    SemanticFact,
+} from './memory/LayeredMemory.js';
+
+// ─── RAG (v0.3.0) ───────────────────────────────────────
+
+export { RAGEngine } from './rag/RAGEngine.js';
+export type {
+    RAGConfig,
+    RAGDocument,
+    RAGSearchResult,
+    RAGContext,
+} from './rag/RAGEngine.js';
+
+export { InMemoryVectorStore } from './rag/VectorStoreAdapter.js';
+export type {
+    VectorStoreAdapter,
+} from './rag/VectorStoreAdapter.js';
+
+// ─── Reasoning (v0.3.0) ─────────────────────────────────
+
+export { ReasoningEngine } from './reasoning/ReasoningEngine.js';
+export type {
+    ReasoningConfig,
+    ReasoningStrategy,
+    ReasoningResult,
+} from './reasoning/ReasoningEngine.js';
+
 // ─── Enterprise ─────────────────────────────────────────
 
 export { RateLimiter } from './enterprise/RateLimiter.js';

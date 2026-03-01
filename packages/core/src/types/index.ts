@@ -36,6 +36,27 @@ export interface GenomeConfig {
     enableAutoML?: boolean;
     enableMultiModel?: boolean;
     evolutionGuardrails?: EvolutionGuardrails;
+
+    // Advanced Features (v0.3.0)
+    layeredMemory?: {
+        enabled: boolean;
+        shortTermMaxMessages?: number;
+        mediumTermMaxMessages?: number;
+        autoCompact?: boolean;
+    };
+
+    rag?: {
+        enabled: boolean;
+        topK?: number;
+        minScore?: number;
+        maxTokens?: number;
+    };
+
+    reasoning?: {
+        enabled: boolean;
+        defaultStrategy?: 'direct' | 'chain-of-thought' | 'self-consistency' | 'tree-of-thoughts' | 'reflection' | 'auto';
+        showSteps?: boolean;
+    };
 }
 
 /**

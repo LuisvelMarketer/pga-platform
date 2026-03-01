@@ -186,3 +186,65 @@ CREATE TABLE IF NOT EXISTS pga_calibration_history (
 
 CREATE INDEX IF NOT EXISTS idx_calibration_context ON pga_calibration_history(context_key, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_calibration_layer ON pga_calibration_history(layer, timestamp DESC);
+
+-- ═══════════════════════════════════════════════════════════
+-- SEMANTIC FACTS (Layered Memory - Long Term Storage)
+-- v0.3.0 - Production-Ready Persistence
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS semantic_facts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    genome_id TEXT NOT NULL REFERENCES pga_genomes(id) ON DELETE CASCADE,
+
+    -- Fact content
+    fact TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('profile', 'preference', 'constraint', 'knowledge')),
+
+    -- Metadata
+    confidence NUMERIC(5,4) NOT NULL CHECK (confidence >= 0.0 AND confidence <= 1.0),
+    source_turn INTEGER NOT NULL,
+    source_interaction_id TEXT,
+
+    -- Lifecycle
+    extracted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expiry TIMESTAMPTZ,  -- NULL = never expires
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_user_genome
+    ON semantic_facts(user_id, genome_id);
+
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_expiry
+    ON semantic_facts(expiry)
+    WHERE expiry IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_category
+    ON semantic_facts(genome_id, category);
+
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_verified
+    ON semantic_facts(genome_id, verified)
+    WHERE verified = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_active
+    ON semantic_facts(user_id, genome_id, expiry)
+    WHERE expiry IS NULL OR expiry > NOW();
+
+-- Auto-update updated_at trigger
+CREATE OR REPLACE FUNCTION update_semantic_facts_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_semantic_facts_updated_at
+    BEFORE UPDATE ON semantic_facts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_semantic_facts_updated_at();
