@@ -17,6 +17,7 @@ import { getBenchmarkSuite } from './BenchmarkSuites.js';
 import type { SandboxCaseDefinition } from './SandboxSuites.js';
 import { SemanticJudge } from './SemanticJudge.js';
 import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
+import { estimateTokenCount } from '../utils/tokens.js';
 
 /**
  * Evaluatable Genome Interface
@@ -144,8 +145,8 @@ export class Evaluator {
             const endTime = Date.now();
             const responseTime = endTime - startTime;
 
-            // Estimate tokens (rough approximation: 4 chars = 1 token)
-            const tokensUsed = Math.ceil((task.userMessage.length + response.length) / 4);
+            // Estimate tokens using consistent utility
+            const tokensUsed = estimateTokenCount(task.userMessage) + estimateTokenCount(response);
 
             // Evaluate success (keyword + length checks)
             const basicChecks = this.checkSuccess(response, task.expectedOutcome);

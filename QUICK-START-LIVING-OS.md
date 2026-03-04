@@ -21,7 +21,7 @@ In the last 3 hours, PGA Platform transformed from a "prompt optimizer" to the *
 ### **1. Cryptographic Security**
 Your C0 (core identity) is now **cryptographically protected** with SHA-256:
 ```typescript
-import { GenomeKernel } from '@pga/core';
+import { GenomeKernel } from '@pga-ai/core';
 
 const kernel = new GenomeKernel(genome);
 kernel.verifyIntegrity(); // ✅ or automatic quarantine
@@ -30,7 +30,7 @@ kernel.verifyIntegrity(); // ✅ or automatic quarantine
 ### **2. Proactive Evolution**
 Detects problems **BEFORE** users complain:
 ```typescript
-import { DriftAnalyzer } from '@pga/core';
+import { DriftAnalyzer } from '@pga-ai/core';
 
 const analyzer = new DriftAnalyzer();
 const analysis = analyzer.analyzeDrift();
@@ -52,7 +52,7 @@ Optimizes **6 dimensions** simultaneously:
 ### **4. Validated Mutations**
 **8-stage validation** before any change goes live:
 ```typescript
-import { PromotionGate } from '@pga/core';
+import { PromotionGate } from '@pga-ai/core';
 
 const gate = new PromotionGate();
 const decision = await gate.evaluateMutation(baseline, mutant, mutation);
@@ -128,9 +128,9 @@ Start with these documents in order:
 
 **Customer Support Bot** (2 minutes):
 ```typescript
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
 import { createCustomerSupportBot } from './examples/starter-templates/customer-support-bot';
 
 const pga = new PGA({
@@ -271,7 +271,7 @@ import {
   ReorderConstraintsOperator,
   SafetyReinforcementOperator,
   ToolSelectionBiasOperator,
-} from '@pga/core';
+} from '@pga-ai/core';
 ```
 
 ### **Complete Flow**:

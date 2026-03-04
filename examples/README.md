@@ -42,7 +42,7 @@ When a user installs PGA in their agent, the agent should announce its new capab
 ### Quick Integration
 
 ```typescript
-import { PGA } from '@pga/core';
+import { PGA } from '@pga-ai/core';
 
 const pga = new PGA({ /* config */ });
 const genome = await pga.createGenome({ name: 'my-agent' });

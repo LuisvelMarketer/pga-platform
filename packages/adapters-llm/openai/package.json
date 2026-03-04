@@ -1,5 +1,5 @@
 {
-  "name": "@pga/adapters-llm-openai",
+  "name": "@pga-ai/adapters-llm-openai",
   "version": "0.1.0",
   "description": "OpenAI adapter for PGA",
   "main": "./dist/index.js",
@@ -18,10 +18,13 @@
   "author": "Luis Alfredo Velasquez Duran",
   "license": "MIT",
   "dependencies": {
-    "@pga/core": "*",
+    "@pga-ai/core": "*",
     "openai": "^4.77.3"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

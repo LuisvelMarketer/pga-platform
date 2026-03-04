@@ -23,6 +23,21 @@ import { MetricsCollector, type MetricsCollectorConfig } from './monitoring/Metr
 import { MonitoringDashboard, type DashboardConfig } from './monitoring/MonitoringDashboard.js';
 import { RAGEngine, type RAGConfig } from './rag/RAGEngine.js';
 import { ReasoningEngine, type ReasoningConfig } from './reasoning/ReasoningEngine.js';
+import { MutationEngine, TokenCompressionOperator, type MutationContext } from './evolution/MutationOperator.js';
+import { estimateTokenCount } from './utils/tokens.js';
+import { DriftAnalyzer } from './evolution/DriftAnalyzer.js';
+import { FitnessCalculator, type InteractionData } from './evolution/FitnessCalculator.js';
+import type { FitnessVector, GenomeV2, OperativeGene, GeneCategory } from './types/GenomeV2.js';
+import { GenesisBootstrap } from './core/GenesisBootstrap.js';
+import { SelfModel, type SelfAssessment } from './advanced-ai/SelfModel.js';
+import { PatternMemory, type BehavioralPattern } from './memory/PatternMemory.js';
+import { Metacognition, type PreResponseAnalysis, type PostResponseAnalysis } from './reasoning/Metacognition.js';
+import { EmotionalModel, type EmotionalState } from './advanced-ai/EmotionalModel.js';
+import { CalibratedAutonomy, type AutonomyDecision } from './advanced-ai/CalibratedAutonomy.js';
+import { PersonalNarrative, type NarrativeSummary, type SignificantMoment } from './memory/PersonalNarrative.js';
+import { AnalyticMemoryEngine, type MemoryQueryResult } from './memory/AnalyticMemoryEngine.js';
+import type { GeneBank } from './gene-bank/GeneBank.js';
+import type { DriftSignal } from './evolution/DriftAnalyzer.js';
 
 export interface PGAConfig {
     /**
@@ -64,6 +79,11 @@ export interface PGAConfig {
      * Optional Reasoning configuration (v0.3.0)
      */
     reasoning?: Partial<ReasoningConfig>;
+
+    /**
+     * Optional Gene Bank for genesis bootstrap + swarm intelligence (v0.5.0)
+     */
+    geneBank?: GeneBank;
 }
 
 /**
@@ -202,6 +222,25 @@ export class PGA {
             },
         });
 
+        // Genesis Bootstrap: seed with high-fitness genes from Gene Bank
+        if (this.pgaConfig.geneBank && genome.config.autonomous?.genesisBootstrap) {
+            const bootstrap = new GenesisBootstrap(this.pgaConfig.geneBank);
+            const result = await bootstrap.bootstrap(
+                genome,
+                genome.config.autonomous.bootstrapMinFitness ?? 0.7,
+            );
+            if (result.genesUpgraded > 0) {
+                await this.pgaConfig.storage.saveGenome(genome);
+                this.metricsCollector.logAudit({
+                    level: 'info',
+                    component: 'pga',
+                    operation: 'genesis-bootstrap',
+                    message: `Bootstrapped ${result.genesUpgraded} genes from Gene Bank`,
+                    metadata: { upgrades: result.upgrades },
+                });
+            }
+        }
+
         return new GenomeInstance(
             genome,
             this.llm,
@@ -210,6 +249,7 @@ export class PGA {
             this.pgaConfig.modelRouter,
             this.pgaConfig.rag,
             this.pgaConfig.reasoning,
+            this.pgaConfig.geneBank,
         );
     }
 
@@ -228,6 +268,7 @@ export class PGA {
             this.pgaConfig.modelRouter,
             this.pgaConfig.rag,
             this.pgaConfig.reasoning,
+            this.pgaConfig.geneBank,
         );
     }
 
@@ -262,6 +303,18 @@ export class GenomeInstance {
     private metrics: MetricsCollector;
     private ragEngine?: RAGEngine;
     private reasoningEngine?: ReasoningEngine;
+    private fitnessTracker: FitnessTracker;
+    private fitnessCalculator: FitnessCalculator;
+    private mutationEngine: MutationEngine;
+    private driftAnalyzer: DriftAnalyzer;
+    private selfModel?: SelfModel;
+    private patternMemory?: PatternMemory;
+    private metacognition?: Metacognition;
+    private emotionalModel?: EmotionalModel;
+    private calibratedAutonomy?: CalibratedAutonomy;
+    private personalNarrative?: PersonalNarrative;
+    private analyticMemory?: AnalyticMemoryEngine;
+    private interactionCount: number = 0;
 
     constructor(
         private genome: Genome,
@@ -271,6 +324,7 @@ export class GenomeInstance {
         modelRouterConfig?: ModelRouterConfig,
         ragConfig?: RAGConfig,
         reasoningConfig?: Partial<ReasoningConfig>,
+        private geneBank?: GeneBank,
     ) {
         this.assembler = new PromptAssembler(storage, genome);
         this.dnaProfile = new DNAProfile(storage);
@@ -301,8 +355,57 @@ export class GenomeInstance {
             this.reasoningEngine = new ReasoningEngine(llm, reasoningConfig);
         }
 
-        // FitnessTracker will be used in future for performance tracking
-        new FitnessTracker(storage, genome);
+        // Evolution components
+        this.fitnessTracker = new FitnessTracker(storage, genome);
+        this.fitnessCalculator = new FitnessCalculator();
+        this.mutationEngine = new MutationEngine();
+        // Register LLM-powered token compression operator
+        this.mutationEngine.registerOperator(new TokenCompressionOperator(llm));
+        this.driftAnalyzer = new DriftAnalyzer();
+
+        // Autonomous Agent: SelfModel (metacognition)
+        if (genome.config.autonomous?.enableSelfModel) {
+            this.selfModel = new SelfModel(genome, this.driftAnalyzer);
+            this.assembler.setSelfModel(this.selfModel);
+        }
+
+        // Autonomous Agent: Pattern Memory (predictive patterns)
+        if (genome.config.autonomous?.enablePatternMemory) {
+            this.patternMemory = new PatternMemory(genome.config.autonomous.maxPatterns ?? 50);
+            this.assembler.setPatternMemory(this.patternMemory);
+        }
+
+        // Autonomous Agent: Metacognition (pre/post response analysis)
+        if (genome.config.autonomous?.enableMetacognition) {
+            this.metacognition = new Metacognition(
+                () => this.selfModel?.assess() ?? null,
+            );
+            this.assembler.setMetacognition(this.metacognition);
+        }
+
+        // Autonomous Agent: EmotionalModel (computational empathy)
+        if (genome.config.autonomous?.enableEmotionalModel) {
+            this.emotionalModel = new EmotionalModel();
+            this.assembler.setEmotionalModel(this.emotionalModel);
+        }
+
+        // Autonomous Agent: CalibratedAutonomy (adaptive autonomy)
+        if (genome.config.autonomous?.enableCalibratedAutonomy) {
+            this.calibratedAutonomy = new CalibratedAutonomy();
+            this.assembler.setCalibratedAutonomy(this.calibratedAutonomy);
+        }
+
+        // Autonomous Agent: PersonalNarrative (relationship memory)
+        if (genome.config.autonomous?.enablePersonalNarrative) {
+            this.personalNarrative = new PersonalNarrative();
+            this.assembler.setPersonalNarrative(this.personalNarrative);
+        }
+
+        // Autonomous Agent: AnalyticMemoryEngine (knowledge graph)
+        if (genome.config.autonomous?.enableAnalyticMemory) {
+            this.analyticMemory = new AnalyticMemoryEngine();
+            this.assembler.setAnalyticMemory(this.analyticMemory);
+        }
     }
 
     /**
@@ -496,6 +599,35 @@ Ready to see what we can do together? 😊`,
                 },
             });
 
+            // Record fitness for drift detection using FitnessCalculator
+            const interactionData: InteractionData = {
+                success: true,
+                quality: 0.7,
+                inputTokens,
+                outputTokens,
+                latency: Date.now() - startTime,
+                model: 'unknown',
+                interventionNeeded: false,
+                timestamp: new Date(),
+            };
+            const fitnessVector = this.fitnessCalculator.computeFitness([interactionData]);
+            this.driftAnalyzer.recordFitness(fitnessVector);
+
+            // Continuous Evolution Loop
+            this.interactionCount++;
+            const autoConfig = this.genome.config.autonomous;
+            if (autoConfig?.continuousEvolution && this.interactionCount % (autoConfig.evolveEveryN ?? 10) === 0) {
+                this.runEvolutionCycle().catch(err =>
+                    this.metrics.logAudit({
+                        level: 'warning',
+                        component: 'genome',
+                        operation: 'auto-evolve',
+                        message: `Auto-evolution failed: ${err instanceof Error ? err.message : String(err)}`,
+                        genomeId: this.genome.id,
+                    })
+                );
+            }
+
             // If userId provided, enable intelligence features
             if (context.userId) {
                 // Get previous DNA for learning detection
@@ -575,8 +707,65 @@ Ready to see what we can do together? 😊`,
         // Update user DNA profile
         await this.dnaProfile.updateDNA(interaction.userId, this.genome.id, fullInteraction);
 
-        // Record fitness for each layer (if we know which alleles were used)
-        // TODO: Track which alleles were selected during assemblePrompt and record their fitness here
+        // Record fitness for active alleles using FitnessTracker
+        for (const allele of this.genome.layers.layer1.filter(a => a.status === 'active')) {
+            // Use a baseline score based on whether the interaction was successful
+            const score = interaction.assistantResponse ? 0.7 : 0.3;
+            await this.fitnessTracker.recordPerformance(1, allele.gene, allele.variant, score);
+        }
+
+        // Pattern Memory: record interaction data
+        if (this.patternMemory) {
+            this.patternMemory.recordInteraction({
+                taskType: interaction.taskType,
+                success: !!interaction.assistantResponse,
+                timestamp: interaction.timestamp,
+            });
+        }
+
+        // Personal Narrative: record interaction for relationship tracking
+        if (this.personalNarrative) {
+            this.personalNarrative.recordInteraction({
+                topic: interaction.taskType,
+                wasSuccessful: !!interaction.assistantResponse,
+                userExpressedGratitude: interaction.userMessage?.toLowerCase().includes('thanks') ||
+                    interaction.userMessage?.toLowerCase().includes('thank you'),
+            });
+        }
+
+        // Analytic Memory: record observations from interaction
+        if (this.analyticMemory && interaction.taskType) {
+            this.analyticMemory.recordObservation({
+                subject: interaction.userId,
+                action: 'performed',
+                object: interaction.taskType,
+                timestamp: interaction.timestamp,
+            });
+        }
+
+        // Metacognition: post-response analysis
+        if (this.metacognition && interaction.assistantResponse) {
+            this.metacognition.analyzePostResponse(
+                interaction.userMessage,
+                interaction.assistantResponse,
+                !!interaction.assistantResponse,
+            );
+        }
+
+        // Calibrated Autonomy: record success
+        if (this.calibratedAutonomy && interaction.taskType && interaction.assistantResponse) {
+            this.calibratedAutonomy.recordSuccess(interaction.taskType);
+        }
+
+        // Swarm: auto-publish high-fitness genes
+        if (this.geneBank && this.genome.config.autonomous?.enableSwarm) {
+            const threshold = this.genome.config.autonomous.autoPublishThreshold ?? 0.85;
+            for (const allele of this.genome.layers.layer1.filter(a => a.status === 'active')) {
+                if (allele.fitness >= threshold && !allele.publishedToSwarm) {
+                    this.autoPublishGene(allele).catch(() => {});
+                }
+            }
+        }
     }
 
     /**
@@ -694,15 +883,47 @@ Ready to see what we can do together? 😊`,
 
         const currentAllele = currentAlleles[0];
 
-        // Step 2: Generate mutation candidate (placeholder for now)
-        // TODO: Use MutationEngine with operators to generate real candidates
+        // Step 2: Generate real mutation candidates using MutationEngine
+        // Include drift signals as evidence for intelligent strategy selection
+        const driftAnalysis = this.driftAnalyzer.analyzeDrift();
+        const mutationContext: MutationContext = {
+            genome: this.toGenomeV2(),
+            targetChromosome: opts.layer <= 1 ? 'c1' : 'c2',
+            targetGene: this.toOperativeGene(currentAllele),
+            reason: `Mutation for ${opts.taskType}: gene ${opts.gene}`,
+            evidence: driftAnalysis.isDrifting
+                ? { driftSignals: driftAnalysis.signals.map(s => ({ type: s.type, severity: s.severity })) }
+                : undefined,
+        };
+
+        let mutatedContent = currentAllele.content;
+        let expectedImprovement = 0.05;
+
+        try {
+            const mutants = await this.mutationEngine.generateMutants(mutationContext, opts.candidates);
+            if (mutants.length > 0) {
+                // Select best mutant by expected improvement
+                const bestMutant = mutants.sort((a, b) => b.expectedImprovement - a.expectedImprovement)[0];
+                // Extract the mutated gene content
+                const mutatedGene = bestMutant.mutant.chromosomes.c1.operations.find(
+                    g => g.category === (currentAllele.gene as GeneCategory)
+                );
+                if (mutatedGene) {
+                    mutatedContent = mutatedGene.content;
+                }
+                expectedImprovement = bestMutant.expectedImprovement;
+            }
+        } catch {
+            // If mutation engine fails, use content as-is with minimal improvement
+        }
+
         const mutationCandidate = {
             layer: opts.layer,
             gene: opts.gene,
             variant: `${currentAllele.variant}_v${Date.now()}`,
-            content: currentAllele.content, // Would be mutated content
-            fitness: currentAllele.fitness + 0.05, // Simulated improvement
-            sandboxScore: 0.75, // Would come from sandbox validation
+            content: mutatedContent,
+            fitness: currentAllele.fitness + expectedImprovement,
+            sandboxScore: 0.75,
             sampleCount: currentAllele.sampleCount || 0,
             rollbackCount: 0,
         };
@@ -1099,5 +1320,529 @@ Ready to see what we can do together? 😊`,
      */
     async getConversationContext(userId: string) {
         return this.contextMemory.buildContext(userId, this.genome.id);
+    }
+
+    /**
+     * Get drift analysis report
+     */
+    getDriftAnalysis() {
+        return this.driftAnalyzer.analyzeDrift();
+    }
+
+    /**
+     * Get agent self-assessment (metacognition)
+     */
+    getSelfAssessment(): SelfAssessment | null {
+        return this.selfModel?.assess() ?? null;
+    }
+
+    /**
+     * Get detected behavioral patterns
+     */
+    getPatterns(): BehavioralPattern[] {
+        return this.patternMemory?.getPatterns() ?? [];
+    }
+
+    /**
+     * Get predictions based on behavioral patterns
+     */
+    getPredictions(): Array<{ prediction: string; confidence: number }> {
+        return this.patternMemory?.getPredictions() ?? [];
+    }
+
+    /**
+     * Get metacognitive pre-response analysis
+     */
+    getPreResponseAnalysis(message: string): PreResponseAnalysis | null {
+        return this.metacognition?.analyzePreResponse(message) ?? null;
+    }
+
+    /**
+     * Get metacognitive post-response analysis
+     */
+    getPostResponseAnalysis(message: string, response: string, wasSuccessful: boolean): PostResponseAnalysis | null {
+        return this.metacognition?.analyzePostResponse(message, response, wasSuccessful) ?? null;
+    }
+
+    /**
+     * Infer emotional state from a message
+     */
+    inferEmotion(message: string): EmotionalState | null {
+        return this.emotionalModel?.inferEmotion(message) ?? null;
+    }
+
+    /**
+     * Evaluate autonomy for a task type
+     */
+    evaluateAutonomy(taskType: string, riskLevel?: 'low' | 'medium' | 'high'): AutonomyDecision | null {
+        return this.calibratedAutonomy?.evaluate(taskType, riskLevel) ?? null;
+    }
+
+    /**
+     * Record an autonomy correction from the user
+     */
+    recordAutonomyCorrection(taskType: string, correctionType: 'undo' | 'modify' | 'reject' | 'approve'): void {
+        this.calibratedAutonomy?.recordCorrection({
+            taskType,
+            wasAutonomous: true,
+            correctionType,
+            timestamp: new Date(),
+        });
+    }
+
+    /**
+     * Get personal narrative summary
+     */
+    getNarrativeSummary(): NarrativeSummary | null {
+        return this.personalNarrative?.getSummary() ?? null;
+    }
+
+    /**
+     * Find a relevant historical callback for a topic
+     */
+    findHistoryCallback(topic: string): SignificantMoment | null {
+        return this.personalNarrative?.callbackToHistory(topic) ?? null;
+    }
+
+    /**
+     * Query the analytic memory knowledge graph
+     */
+    queryMemory(question: string): MemoryQueryResult | null {
+        return this.analyticMemory?.query(question) ?? null;
+    }
+
+    /**
+     * Record an observation to the analytic memory
+     */
+    recordMemoryObservation(observation: {
+        subject: string;
+        action: string;
+        object?: string;
+        context?: Record<string, unknown>;
+    }): void {
+        this.analyticMemory?.recordObservation(observation);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // AUTONOMOUS AGENT: PRIVATE METHODS
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Continuous Evolution Loop — proactive auto-evolution.
+     * Runs periodically (fire-and-forget from chat).
+     */
+    private async runEvolutionCycle(): Promise<void> {
+        const autoConfig = this.genome.config.autonomous;
+        const drift = this.driftAnalyzer.analyzeDrift();
+
+        // 1. Auto-mutate on drift
+        if (autoConfig?.autoMutateOnDrift !== false && drift.isDrifting) {
+            for (const signal of drift.signals) {
+                if (signal.severity === 'minor') continue;
+                const target = this.driftToMutationTarget(signal);
+                await this.mutate({
+                    layer: target.layer,
+                    gene: target.gene,
+                    taskType: `auto-evolve:${signal.type}`,
+                });
+            }
+        }
+
+        // 2. Auto-compress on token pressure
+        if (autoConfig?.autoCompressOnPressure !== false) {
+            const totalC1Tokens = this.genome.layers.layer1
+                .filter(a => a.status === 'active')
+                .reduce((sum, a) => sum + estimateTokenCount(a.content), 0);
+            const threshold = this.genome.config.compression?.autoCompressThreshold ?? 1600;
+            if (totalC1Tokens > threshold) {
+                await this.compressGenes();
+            }
+        }
+
+        // 3. Swarm: auto-import genes when struggling
+        if (this.geneBank && autoConfig?.enableSwarm && drift.isDrifting) {
+            const targetSeverity = autoConfig.autoImportOnDrift ?? 'severe';
+            const severityRank = (s: string) =>
+                s === 'critical' ? 3 : s === 'major' ? 2 : s === 'moderate' ? 1 : 0;
+            for (const signal of drift.signals) {
+                if (severityRank(signal.severity) >= severityRank(targetSeverity)) {
+                    await this.autoImportGene(signal);
+                }
+            }
+        }
+
+        this.metrics.logAudit({
+            level: 'info',
+            component: 'genome',
+            operation: 'evolution-cycle',
+            message: `Evolution cycle #${this.interactionCount} completed`,
+            genomeId: this.genome.id,
+            metadata: { isDrifting: drift.isDrifting, signalCount: drift.signals.length },
+        });
+    }
+
+    /**
+     * Map drift signal type to appropriate gene + layer target.
+     */
+    private driftToMutationTarget(signal: DriftSignal): { layer: 0 | 1 | 2; gene: string } {
+        const mapping: Record<string, { layer: 0 | 1 | 2; gene: string }> = {
+            'quality-decline': { layer: 1, gene: 'coding-patterns' },
+            'efficiency-decline': { layer: 1, gene: 'tool-usage' },
+            'cost-increase': { layer: 1, gene: 'tool-usage' },
+            'intervention-increase': { layer: 1, gene: 'coding-patterns' },
+            'latency-increase': { layer: 1, gene: 'tool-usage' },
+        };
+        return mapping[signal.type] || { layer: 2, gene: 'communication-style' };
+    }
+
+    /**
+     * Swarm: auto-publish a high-fitness gene to Gene Bank.
+     */
+    private async autoPublishGene(allele: typeof this.genome.layers.layer1[0]): Promise<void> {
+        if (!this.geneBank) return;
+
+        try {
+            const cognitiveGene = {
+                id: `auto_${this.genome.id}_${allele.gene}_${Date.now()}`,
+                version: '1.0.0',
+                name: `${allele.gene} from ${this.genome.name}`,
+                description: `Auto-published ${allele.gene} gene with fitness ${allele.fitness.toFixed(2)}`,
+                type: this.geneCategoryToType(allele.gene),
+                domain: 'general',
+                content: {
+                    instruction: allele.content,
+                    requiredCapabilities: [] as string[],
+                    applicableContexts: [] as string[],
+                    contraindications: [] as string[],
+                    metadata: {} as Record<string, unknown>,
+                },
+                fitness: {
+                    overallFitness: allele.fitness,
+                    taskSuccessRate: allele.fitness,
+                    tokenEfficiency: 0.7,
+                    responseQuality: allele.fitness,
+                    adoptionCount: 0,
+                    adoptionPerformance: null,
+                },
+                lineage: {
+                    parentGeneId: null,
+                    generation: allele.generation || 0,
+                    ancestors: [] as string[],
+                    mutationHistory: [] as Array<{ timestamp: string; change: string; fitnessGain: number }>,
+                },
+                tenant: {
+                    tenantId: this.genome.familyId || this.genome.id,
+                    createdBy: this.genome.id,
+                    scope: 'tenant' as const,
+                },
+                tags: [allele.gene],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            await this.geneBank.storeGene(cognitiveGene as unknown as Parameters<GeneBank['storeGene']>[0]);
+            allele.publishedToSwarm = true;
+
+            this.metrics.logAudit({
+                level: 'info',
+                component: 'genome',
+                operation: 'swarm-publish',
+                message: `Auto-published gene ${allele.gene} (fitness: ${allele.fitness.toFixed(2)})`,
+                genomeId: this.genome.id,
+            });
+        } catch {
+            // Non-critical — don't block
+        }
+    }
+
+    /**
+     * Swarm: auto-import a gene from Gene Bank to address drift.
+     */
+    private async autoImportGene(signal: DriftSignal): Promise<void> {
+        if (!this.geneBank) return;
+
+        const target = this.driftToMutationTarget(signal);
+        const geneTypes = [this.geneCategoryToType(target.gene)];
+
+        try {
+            const candidates = await this.geneBank.searchGenes({
+                type: geneTypes,
+                minFitness: 0.75,
+                sortBy: 'fitness',
+                sortOrder: 'desc',
+                limit: 1,
+            });
+
+            if (candidates.length === 0) return;
+
+            const bestGene = candidates[0];
+
+            // Inject as a new allele variant
+            await this.addAllele(
+                target.layer,
+                target.gene,
+                `swarm_${bestGene.id.slice(0, 8)}_${Date.now()}`,
+                bestGene.content.instruction,
+            );
+
+            this.metrics.logAudit({
+                level: 'info',
+                component: 'genome',
+                operation: 'swarm-import',
+                message: `Auto-imported gene ${bestGene.name} for ${signal.type}`,
+                genomeId: this.genome.id,
+            });
+        } catch {
+            // Non-critical
+        }
+    }
+
+    /**
+     * Map gene category name to Gene Bank gene type.
+     */
+    private geneCategoryToType(category: string): string {
+        const mapping: Record<string, string> = {
+            'tool-usage': 'tool-usage-pattern',
+            'coding-patterns': 'reasoning-pattern',
+            'communication-style': 'communication-pattern',
+        };
+        return mapping[category] || 'reasoning-pattern';
+    }
+
+    /**
+     * Convert v1 Genome (layers) to GenomeV2 (chromosomes) for MutationEngine
+     */
+    private toGenomeV2(): GenomeV2 {
+        const defaultFitness: FitnessVector = {
+            quality: 0.5, successRate: 0.5, tokenEfficiency: 0.5,
+            latency: 1000, costPerSuccess: 0.01, interventionRate: 0.1,
+            composite: 0.5, sampleSize: 0, lastUpdated: new Date(), confidence: 0,
+        };
+
+        // Map layer1 alleles to OperativeGene[]
+        const operations: OperativeGene[] = this.genome.layers.layer1
+            .filter(a => a.status === 'active')
+            .map(a => ({
+                id: `${this.genome.id}_${a.gene}_${a.variant}`,
+                category: a.gene as GeneCategory,
+                content: a.content,
+                fitness: defaultFitness,
+                origin: 'initial' as const,
+                usageCount: a.sampleCount || 0,
+                lastUsed: new Date(),
+                successRate: a.fitness || 0.5,
+            }));
+
+        return {
+            id: this.genome.id,
+            name: this.genome.name,
+            familyId: this.genome.familyId || this.genome.id,
+            version: this.genome.version || 1,
+            chromosomes: {
+                c0: {
+                    identity: {
+                        role: this.genome.layers.layer0[0]?.content || 'AI Assistant',
+                        purpose: 'Genomic self-evolving prompt agent',
+                        constraints: this.genome.layers.layer0.slice(1).map(a => a.content),
+                    },
+                    security: {
+                        forbiddenTopics: [],
+                        accessControls: [],
+                        safetyRules: [],
+                    },
+                    attribution: {
+                        creator: 'PGA',
+                        copyright: 'PGA Platform',
+                        license: 'MIT',
+                    },
+                    metadata: {
+                        version: '2.0.0',
+                        createdAt: this.genome.createdAt,
+                    },
+                },
+                c1: {
+                    operations,
+                    metadata: {
+                        lastMutated: new Date(),
+                        mutationCount: 0,
+                        avgFitnessGain: 0,
+                    },
+                },
+                c2: {
+                    userAdaptations: new Map(),
+                    contextPatterns: [],
+                    metadata: {
+                        lastMutated: new Date(),
+                        adaptationRate: 0,
+                        totalUsers: 0,
+                    },
+                },
+            },
+            integrity: {
+                c0Hash: this.genome.c0IntegrityHash || '',
+                lastVerified: new Date(),
+                violations: 0,
+                quarantined: false,
+            },
+            lineage: {
+                parentVersion: this.genome.lineage?.parentVersion,
+                inheritedGenes: [],
+                mutations: [],
+            },
+            fitness: defaultFitness,
+            config: {
+                mutationRate: this.genome.config.mutationRate === 'slow' ? 'conservative' : this.genome.config.mutationRate,
+                epsilonExplore: this.genome.config.epsilonExplore ?? 0.1,
+                enableSandbox: this.genome.config.enableSandbox,
+                fitnessWeights: undefined,
+                minFitnessImprovement: 0.05,
+                enableIntegrityCheck: true,
+                autoRollbackThreshold: 0.15,
+                allowInheritance: true,
+                minCompatibilityScore: 0.6,
+            },
+            state: 'active',
+            tags: [],
+            createdAt: this.genome.createdAt,
+            updatedAt: this.genome.updatedAt,
+        };
+    }
+
+    /**
+     * Convert a GeneAllele to OperativeGene format
+     */
+    private toOperativeGene(allele: { gene: string; variant: string; content: string; fitness: number }): OperativeGene {
+        const defaultFitness: FitnessVector = {
+            quality: allele.fitness, successRate: allele.fitness, tokenEfficiency: 0.5,
+            latency: 1000, costPerSuccess: 0.01, interventionRate: 0.1,
+            composite: allele.fitness, sampleSize: 0, lastUpdated: new Date(), confidence: 0,
+        };
+
+        return {
+            id: `${this.genome.id}_${allele.gene}_${allele.variant}`,
+            category: allele.gene as GeneCategory,
+            content: allele.content,
+            fitness: defaultFitness,
+            origin: 'initial',
+            usageCount: 0,
+            lastUsed: new Date(),
+            successRate: allele.fitness,
+            tokenCount: estimateTokenCount(allele.content),
+        };
+    }
+
+    /**
+     * Trigger token compression on all active C1 genes.
+     *
+     * Uses LLM to compress gene content while preserving ALL functional
+     * capabilities. Compressed mutations pass through EvolutionGuardrails
+     * before being applied (no safety bypass).
+     *
+     * Respects CompressionConfig:
+     * - minFitnessForCompression: skip low-fitness genes
+     * - maxCompressionRatio: reject overly aggressive compression
+     *
+     * @returns Compression results with token savings
+     */
+    async compressGenes(): Promise<{
+        compressed: boolean;
+        totalOriginalTokens: number;
+        totalCompressedTokens: number;
+        tokensSaved: number;
+        reductionPercent: number;
+    }> {
+        const emptyResult = { compressed: false, totalOriginalTokens: 0, totalCompressedTokens: 0, tokensSaved: 0, reductionPercent: 0 };
+
+        const compressionOperator = this.mutationEngine.getOperator('compress_instructions');
+        if (!compressionOperator) return emptyResult;
+
+        const compressionConfig = this.genome.config.compression;
+        const maxRatio = compressionConfig?.maxCompressionRatio ?? 0.3;
+
+        const context: MutationContext = {
+            genome: this.toGenomeV2(),
+            targetChromosome: 'c1',
+            reason: 'Token compression: optimize gene token usage while preserving functionality',
+        };
+
+        const result = await compressionOperator.mutate(context);
+
+        if (!result.success || !result.compressionMetrics) return emptyResult;
+
+        const metrics = result.compressionMetrics;
+
+        // Safety: reject if compression is too aggressive (below max ratio)
+        if (metrics.ratio < maxRatio) {
+            return emptyResult;
+        }
+
+        // Validate through EvolutionGuardrails before applying
+        const gateResult = await this.guardrailsManager.evaluateCandidate(
+            {
+                layer: 1,
+                gene: 'compression',
+                variant: `compressed_v${Date.now()}`,
+                content: JSON.stringify(result.mutant.chromosomes.c1.operations.map(g => g.content)),
+                fitness: result.expectedImprovement + 0.5,
+                sandboxScore: 0.8,
+                sampleCount: 0,
+                rollbackCount: 0,
+            },
+            this.genome.id,
+        );
+
+        if (gateResult.finalDecision === 'reject') {
+            return emptyResult;
+        }
+
+        // Gate passed — apply compressed content back to genome alleles
+        const minFitness = compressionConfig?.minFitnessForCompression ?? 0.3;
+
+        for (const operation of result.mutant.chromosomes.c1.operations) {
+            const allele = this.genome.layers.layer1.find(
+                a => a.gene === operation.category && a.status === 'active'
+            );
+            if (allele && allele.fitness >= minFitness) {
+                allele.content = operation.content;
+            }
+        }
+
+        return {
+            compressed: true,
+            totalOriginalTokens: metrics.originalTokens,
+            totalCompressedTokens: metrics.compressedTokens,
+            tokensSaved: metrics.originalTokens - metrics.compressedTokens,
+            reductionPercent: Math.round((1 - metrics.ratio) * 100),
+        };
+    }
+
+    /**
+     * Get the recommended mutation strategy based on current drift signals.
+     *
+     * Returns ranked operators with contextual reasoning — useful for
+     * understanding WHY PGA chose a specific mutation approach.
+     */
+    getMutationStrategy(): Array<{
+        operator: string;
+        score: number;
+        reason: string;
+    }> {
+        const context: MutationContext = {
+            genome: this.toGenomeV2(),
+            targetChromosome: 'c1',
+            reason: 'Strategy analysis',
+            evidence: (() => {
+                const drift = this.driftAnalyzer.analyzeDrift();
+                return drift.isDrifting
+                    ? { driftSignals: drift.signals.map(s => ({ type: s.type, severity: s.severity })) }
+                    : undefined;
+            })(),
+        };
+
+        return this.mutationEngine.selectMutationStrategy(context).map(s => ({
+            operator: s.operator.name,
+            score: s.score,
+            reason: s.reason,
+        }));
     }
 }

@@ -1,5 +1,5 @@
 /**
- * @pga/core — Genomic Self-Evolving Prompts
+ * @pga-ai/core — Genomic Self-Evolving Prompts
  *
  * World's first autonomous prompt evolution system for AI agents
  *
@@ -9,9 +9,9 @@
  *
  * @example
  * ```typescript
- * import { PGA } from '@pga/core';
- * import { ClaudeAdapter } from '@pga/adapters-llm/anthropic';
- * import { PostgresAdapter } from '@pga/adapters-storage/postgres';
+ * import { PGA } from '@pga-ai/core';
+ * import { ClaudeAdapter } from '@pga-ai/adapters-llm/anthropic';
+ * import { PostgresAdapter } from '@pga-ai/adapters-storage/postgres';
  *
  * const pga = new PGA({
  *   llm: new ClaudeAdapter({ apiKey: process.env.ANTHROPIC_KEY }),
@@ -146,6 +146,102 @@ export type {
     ReasoningResult,
 } from './reasoning/ReasoningEngine.js';
 
+// ─── Gene Bank (v0.4.0) ─────────────────────────────────
+
+export {
+    // Core types
+    CognitiveGeneSchema,
+    GeneTypeSchema,
+    GeneContentSchema,
+    FitnessMetricsSchema,
+    LineageSchema,
+    TenantInfoSchema,
+    SharingScopeSchema,
+    GeneExtractionResultSchema,
+    GeneAdoptionResultSchema,
+    createGeneId,
+    meetsMinimumFitness,
+    calculateFitnessDelta,
+    isMarketplaceReady,
+
+    // Components
+    GeneBank,
+    GeneBankConfigSchema,
+    GeneExtractor,
+    GeneExtractionConfigSchema,
+    GeneMatcher,
+    GeneMatchConfigSchema,
+    SandboxTester,
+    SandboxConfigSchema,
+    GeneAdopter,
+    GeneAdoptionConfigSchema,
+} from './gene-bank/index.js';
+
+// Storage Adapters (included)
+export { InMemoryGeneStorage } from './gene-bank/adapters/InMemoryGeneStorage.js';
+
+export type {
+    // Core types
+    CognitiveGene,
+    GeneType,
+    GeneContent,
+    FitnessMetrics as GeneFitnessMetrics,
+    Lineage,
+    TenantInfo,
+    SharingScope,
+    GeneExtractionResult,
+    GeneAdoptionResult,
+
+    // Gene Bank
+    GeneBankConfig,
+    GeneBankStats,
+    GeneStorageAdapter,
+    GeneSearchFilters,
+
+    // Gene Extractor
+    GeneExtractionConfig,
+    MutationContext as GeneMutationContext,
+
+    // Gene Matcher
+    GeneMatchConfig,
+    MatchContext,
+    GeneMatchResult,
+
+    // Sandbox Tester
+    SandboxConfig,
+    SandboxTestCase,
+    TestCaseResult,
+    SandboxTestResult,
+    BaselinePerformance,
+
+    // Gene Adopter
+    GeneAdoptionConfig,
+    AdoptionRequest,
+    AdoptedGeneStatus,
+} from './gene-bank/index.js';
+
+// ─── Memory Compaction (v0.4.0) ─────────────────────────
+
+export { MemoryCompactor } from './memory-compaction/MemoryCompactor.js';
+export {
+    SlidingWindowStrategy,
+    ImportanceBasedStrategy,
+    BaseCompactionStrategy,
+} from './memory-compaction/index.js';
+
+export type {
+    Message as MemoryMessage,
+    CompactedMessage,
+    Conversation,
+    CompactionResult,
+    MemoryItem,
+    CompactionConfig,
+    CompactionStrategy,
+    ICompactionStrategy,
+    PrioritizationOptions,
+    ConversationSummary,
+} from './memory-compaction/index.js';
+
 // ─── Enterprise ─────────────────────────────────────────
 
 export { RateLimiter } from './enterprise/RateLimiter.js';
@@ -248,6 +344,7 @@ export {
     ReorderConstraintsOperator,
     SafetyReinforcementOperator,
     ToolSelectionBiasOperator,
+    TokenCompressionOperator,
 } from './evolution/MutationOperator.js';
 export type {
     IMutationOperator,
@@ -276,6 +373,46 @@ export type {
     CanaryDecision,
 } from './evolution/CanaryDeployment.js';
 
+// ─── Evolution Boost 2.0 (100x Power!) ─────────────────
+
+export { EvolutionBoostEngine } from './evolution/boost/EvolutionBoostEngine.js';
+export type {
+    EvolutionMode,
+    EvolutionBoostConfig,
+    EvolutionResult,
+} from './evolution/boost/EvolutionBoostEngine.js';
+
+export { ParallelEvolutionEngine } from './evolution/boost/ParallelEvolutionEngine.js';
+export type {
+    ParallelEvolutionConfig,
+    MutationBranch,
+} from './evolution/boost/ParallelEvolutionEngine.js';
+
+export { MetaEvolutionEngine } from './evolution/boost/MetaEvolutionEngine.js';
+export type {
+    OperatorPerformance,
+    ContextualPerformance,
+    MetaEvolutionConfig,
+} from './evolution/boost/MetaEvolutionEngine.js';
+
+export { ParetoOptimizer } from './evolution/boost/ParetoOptimizer.js';
+export type {
+    ParetoSolution,
+    OptimizationObjectives,
+} from './evolution/boost/ParetoOptimizer.js';
+
+export { GeneticRecombinator } from './evolution/boost/GeneticRecombinator.js';
+export type {
+    RecombinationParent,
+    RecombinationResult,
+} from './evolution/boost/GeneticRecombinator.js';
+
+// Boost Operators (40-80% improvement!)
+export { SemanticRestructuringOperator } from './evolution/boost/operators/SemanticRestructuringOperator.js';
+export { PatternExtractionOperator } from './evolution/boost/operators/PatternExtractionOperator.js';
+export { CrossoverMutationOperator } from './evolution/boost/operators/CrossoverMutationOperator.js';
+export { BreakthroughOperator } from './evolution/boost/operators/BreakthroughOperator.js';
+
 // ─── Interfaces ─────────────────────────────────────────
 
 export type { LLMAdapter, Message, ChatOptions, ChatResponse, ChatChunk } from './interfaces/LLMAdapter.js';
@@ -302,6 +439,8 @@ export type {
     EvolutionGuardrails,
     EconomicMetrics,
     PromotionGateResult,
+    CompressionConfig,
+    AutonomousConfig,
 } from './types/index.js';
 
 // ─── Types v2 (Living OS) ───────────────────────────────
@@ -336,8 +475,66 @@ export type {
     GenomeFamily,
 } from './types/GenomeV2.js';
 
+// ─── Autonomous Agent (v0.5.0) ─────────────────────────
+
+export { GenesisBootstrap } from './core/GenesisBootstrap.js';
+export type { BootstrapResult } from './core/GenesisBootstrap.js';
+
+export { SelfModel } from './advanced-ai/SelfModel.js';
+export type { SelfAssessment } from './advanced-ai/SelfModel.js';
+
+export { PatternMemory } from './memory/PatternMemory.js';
+export type { BehavioralPattern } from './memory/PatternMemory.js';
+
+// ─── Living Agent v0.6.0 ────────────────────────────────
+
+export { Metacognition } from './reasoning/Metacognition.js';
+export type {
+    ConfidenceAssessment,
+    PreResponseAnalysis,
+    PostResponseInsight,
+    PostResponseAnalysis,
+} from './reasoning/Metacognition.js';
+
+export { EmotionalModel } from './advanced-ai/EmotionalModel.js';
+export type {
+    Emotion,
+    EmotionalState,
+    EngagementLevel,
+    ToneGuidance,
+} from './advanced-ai/EmotionalModel.js';
+
+export { CalibratedAutonomy } from './advanced-ai/CalibratedAutonomy.js';
+export type {
+    ValidationLevel,
+    AutonomyThreshold,
+    AutonomyDecision,
+} from './advanced-ai/CalibratedAutonomy.js';
+
+export { PersonalNarrative } from './memory/PersonalNarrative.js';
+export type {
+    RelationshipStage,
+    SignificantMoment,
+    SharedAchievement,
+    NarrativeSummary,
+} from './memory/PersonalNarrative.js';
+
+export { AnalyticMemoryEngine } from './memory/AnalyticMemoryEngine.js';
+export type {
+    Entity,
+    Relation,
+    RelationType,
+    Inference,
+    MemoryQueryResult,
+    TemporalPattern,
+} from './memory/AnalyticMemoryEngine.js';
+
+// ─── Token Utilities ────────────────────────────────────
+
+export { estimateTokenCount, tokenEfficiency, compressionRatio } from './utils/tokens.js';
+
 // ─── Version ────────────────────────────────────────────
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.6.0';
 export const AUTHOR = 'Luis Alfredo Velasquez Duran';
 export const YEAR = 2025;

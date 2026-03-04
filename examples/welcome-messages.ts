@@ -5,9 +5,9 @@
  * that your agent can use to announce PGA integration to users.
  */
 
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
 
 async function main() {
     // Initialize PGA

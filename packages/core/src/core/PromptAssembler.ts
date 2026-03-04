@@ -10,10 +10,29 @@ import type { StorageAdapter } from '../interfaces/StorageAdapter.js';
 import type { Genome, SelectionContext } from '../types/index.js';
 import { ContextMemory } from './ContextMemory.js';
 import { ProactiveSuggestions } from './ProactiveSuggestions.js';
+import { estimateTokenCount, tokenEfficiency } from '../utils/tokens.js';
+import type { SelfModel } from '../advanced-ai/SelfModel.js';
+import type { PatternMemory } from '../memory/PatternMemory.js';
+import type { Metacognition } from '../reasoning/Metacognition.js';
+import type { EmotionalModel } from '../advanced-ai/EmotionalModel.js';
+import type { CalibratedAutonomy } from '../advanced-ai/CalibratedAutonomy.js';
+import type { PersonalNarrative } from '../memory/PersonalNarrative.js';
+import type { AnalyticMemoryEngine } from '../memory/AnalyticMemoryEngine.js';
+
+const DEFAULT_C1_TOKEN_BUDGET = 2000;
+const getC1Budget = (genome: Genome): number =>
+    genome.config.compression?.c1TokenBudget ?? DEFAULT_C1_TOKEN_BUDGET;
 
 export class PromptAssembler {
     private contextMemory: ContextMemory;
     private proactiveSuggestions: ProactiveSuggestions;
+    private selfModel?: SelfModel;
+    private patternMemory?: PatternMemory;
+    private metacognition?: Metacognition;
+    private emotionalModel?: EmotionalModel;
+    private calibratedAutonomy?: CalibratedAutonomy;
+    private personalNarrative?: PersonalNarrative;
+    private analyticMemory?: AnalyticMemoryEngine;
 
     constructor(
         storage: StorageAdapter,
@@ -21,6 +40,55 @@ export class PromptAssembler {
     ) {
         this.contextMemory = new ContextMemory(storage);
         this.proactiveSuggestions = new ProactiveSuggestions(storage);
+    }
+
+    /**
+     * Set SelfModel for metacognition prompt injection.
+     */
+    setSelfModel(selfModel: SelfModel): void {
+        this.selfModel = selfModel;
+    }
+
+    /**
+     * Set PatternMemory for predictive prompt injection.
+     */
+    setPatternMemory(patternMemory: PatternMemory): void {
+        this.patternMemory = patternMemory;
+    }
+
+    /**
+     * Set Metacognition for pre-response analysis injection.
+     */
+    setMetacognition(metacognition: Metacognition): void {
+        this.metacognition = metacognition;
+    }
+
+    /**
+     * Set EmotionalModel for empathetic response adaptation.
+     */
+    setEmotionalModel(emotionalModel: EmotionalModel): void {
+        this.emotionalModel = emotionalModel;
+    }
+
+    /**
+     * Set CalibratedAutonomy for autonomy guidance injection.
+     */
+    setCalibratedAutonomy(calibratedAutonomy: CalibratedAutonomy): void {
+        this.calibratedAutonomy = calibratedAutonomy;
+    }
+
+    /**
+     * Set PersonalNarrative for relationship context injection.
+     */
+    setPersonalNarrative(personalNarrative: PersonalNarrative): void {
+        this.personalNarrative = personalNarrative;
+    }
+
+    /**
+     * Set AnalyticMemoryEngine for knowledge graph injection.
+     */
+    setAnalyticMemory(analyticMemory: AnalyticMemoryEngine): void {
+        this.analyticMemory = analyticMemory;
     }
 
     /**
@@ -70,6 +138,68 @@ export class PromptAssembler {
             }
         }
 
+        // Metacognition: SelfModel prompt section
+        if (this.selfModel) {
+            const selfSection = this.selfModel.toPromptSection();
+            if (selfSection) {
+                sections.push(selfSection);
+            }
+        }
+
+        // Predictive: PatternMemory prompt section
+        if (this.patternMemory) {
+            const patternSection = this.patternMemory.toPromptSection();
+            if (patternSection) {
+                sections.push(patternSection);
+            }
+        }
+
+        // Metacognition: Pre-response analysis
+        if (this.metacognition && currentMessage) {
+            const preAnalysis = this.metacognition.analyzePreResponse(currentMessage);
+            const metaSection = this.metacognition.toPromptSection(preAnalysis);
+            if (metaSection) {
+                sections.push(metaSection);
+            }
+        }
+
+        // Emotional awareness: adapt tone to user state
+        if (this.emotionalModel && currentMessage) {
+            const emotionalState = this.emotionalModel.inferEmotion(currentMessage);
+            const emotionSection = this.emotionalModel.toPromptSection(emotionalState);
+            if (emotionSection) {
+                sections.push(emotionSection);
+            }
+        }
+
+        // Autonomy calibration: guide autonomous behavior
+        if (this.calibratedAutonomy) {
+            const taskType = context?.taskType || context?.metadata?.taskType as string | undefined;
+            if (taskType) {
+                const autonomySection = this.calibratedAutonomy.toPromptSection(taskType);
+                if (autonomySection) {
+                    sections.push(autonomySection);
+                }
+            }
+        }
+
+        // Personal narrative: relationship context
+        if (this.personalNarrative) {
+            const narrativeSection = this.personalNarrative.toPromptSection();
+            if (narrativeSection) {
+                sections.push(narrativeSection);
+            }
+        }
+
+        // Analytic memory: knowledge graph context
+        if (this.analyticMemory) {
+            const currentTopic = context?.taskType;
+            const knowledgeSection = this.analyticMemory.toPromptSection(currentTopic);
+            if (knowledgeSection) {
+                sections.push(knowledgeSection);
+            }
+        }
+
         return sections.join('\n\n---\n\n');
     }
 
@@ -95,13 +225,57 @@ export class PromptAssembler {
         }
 
         // Select best variant for each gene
-        const selected: string[] = [];
+        const candidates: Array<{ content: string; fitness: number; tokenCount: number }> = [];
         for (const [_gene, variants] of byGene) {
             const best = this.selectByEpsilonGreedy(
                 variants,
                 this.genome.config.epsilonExplore || 0.1,
             );
-            selected.push(best.content);
+            candidates.push({
+                content: best.content,
+                fitness: best.fitness,
+                tokenCount: estimateTokenCount(best.content),
+            });
+        }
+
+        // Token budget enforcement for layer 1
+        if (layer === 1) {
+            return this.applyTokenBudget(candidates, getC1Budget(this.genome));
+        }
+
+        return candidates.map(c => c.content);
+    }
+
+    /**
+     * Apply token budget: if total tokens exceed budget, rank by
+     * token efficiency (fitness/tokens) and fill greedily.
+     */
+    private applyTokenBudget(
+        candidates: Array<{ content: string; fitness: number; tokenCount: number }>,
+        budget: number,
+    ): string[] {
+        const totalTokens = candidates.reduce((sum, c) => sum + c.tokenCount, 0);
+
+        // Under budget → include all
+        if (totalTokens <= budget) {
+            return candidates.map(c => c.content);
+        }
+
+        // Over budget → rank by value-per-token and fill greedily
+        const ranked = [...candidates].sort((a, b) => {
+            const effA = tokenEfficiency(a.fitness, a.tokenCount);
+            const effB = tokenEfficiency(b.fitness, b.tokenCount);
+            return effB - effA; // Higher efficiency first
+        });
+
+        const selected: string[] = [];
+        let usedTokens = 0;
+
+        for (const candidate of ranked) {
+            if (usedTokens + candidate.tokenCount <= budget) {
+                selected.push(candidate.content);
+                usedTokens += candidate.tokenCount;
+            }
         }
 
         return selected;

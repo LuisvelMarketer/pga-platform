@@ -10,9 +10,9 @@
  * @since 2026-02-27
  */
 
-import { PGA, type EvolutionGuardrails } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
+import { PGA, type EvolutionGuardrails } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
 
 async function productionMonitoringDemo() {
     // ═══════════════════════════════════════════════════════

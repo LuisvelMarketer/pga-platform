@@ -15,6 +15,7 @@
 import type { StorageAdapter } from '../interfaces/StorageAdapter.js';
 import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
 import type { Interaction } from '../types/index.js';
+import type { MetricsCollector } from '../monitoring/MetricsCollector.js';
 
 // ─── Memory Layer Interfaces ───────────────────────────────
 
@@ -123,12 +124,15 @@ export class LayeredMemory {
     private summaryCache: Map<string, { summary: string; timestamp: Date }> = new Map();
     private lastCompactionTimes: Map<string, Date> = new Map();
     private turnCounters: Map<string, number> = new Map();
+    private metricsCollector?: MetricsCollector;
 
     constructor(
         private storage: StorageAdapter,
         private llm: LLMAdapter,
-        config?: Partial<LayeredMemoryConfig>
+        config?: Partial<LayeredMemoryConfig>,
+        metricsCollector?: MetricsCollector
     ) {
+        this.metricsCollector = metricsCollector;
         this.config = {
             enabled: config?.enabled ?? true,
             shortTerm: {
@@ -303,6 +307,7 @@ export class LayeredMemory {
      * Compact memory (summarize old messages)
      */
     async compactMemory(userId: string, genomeId: string): Promise<void> {
+        const startTime = Date.now();
         const interactions = await this.getAllInteractions(userId, genomeId);
 
         // Skip if not enough messages
@@ -310,9 +315,15 @@ export class LayeredMemory {
             return;
         }
 
+        // Calculate tokens before compaction
+        const fullText = interactions.map(i => `${i.userMessage} ${i.assistantResponse}`).join(' ');
+        const tokensBeforeCompaction = this.estimateTokens(fullText);
+
         // Separate short-term (keep full) and medium-term (summarize)
         const shortTermCutoff = interactions.length - this.config.shortTerm.maxMessages;
         const mediumTermMessages = interactions.slice(0, shortTermCutoff);
+
+        let tokensAfterCompaction = tokensBeforeCompaction;
 
         // Summarize medium-term messages and cache
         if (mediumTermMessages.length > 0) {
@@ -323,10 +334,39 @@ export class LayeredMemory {
                 summary,
                 timestamp: new Date(),
             });
+
+            // Calculate tokens after compaction
+            const shortTermText = interactions
+                .slice(-this.config.shortTerm.maxMessages)
+                .map(i => `${i.userMessage} ${i.assistantResponse}`)
+                .join(' ');
+            tokensAfterCompaction = this.estimateTokens(shortTermText + summary);
         }
 
         // Update last compaction time
         await this.setLastCompactionTime(userId, genomeId, new Date());
+
+        // Track metrics
+        const latencyMs = Date.now() - startTime;
+        const compressionRatio = tokensBeforeCompaction > 0
+            ? 1 - (tokensAfterCompaction / tokensBeforeCompaction)
+            : 0;
+
+        this.metricsCollector?.logAudit({
+            level: 'info',
+            component: 'LayeredMemory',
+            operation: 'compaction',
+            userId,
+            genomeId,
+            message: `Compacted ${mediumTermMessages.length} messages with ${compressionRatio.toFixed(1)}x compression ratio`,
+            duration: latencyMs,
+            metadata: {
+                messagesCompacted: mediumTermMessages.length,
+                tokensBeforeCompaction,
+                tokensAfterCompaction,
+                compressionRatio,
+            },
+        });
     }
 
     // ─── Private Methods ───────────────────────────────────────
@@ -441,6 +481,7 @@ Summary:`;
         genomeId: string,
         interaction: Interaction
     ): Promise<void> {
+        const startTime = Date.now();
         const cacheKey = `${userId}:${genomeId}`;
 
         // Increment turn counter
@@ -489,7 +530,29 @@ If no permanent facts found, return: {"facts": []}
                 (f: any) => f.confidence >= this.config.longTerm.minConfidence
             );
 
-            if (validFacts.length === 0) return;
+            // Calculate average confidence
+            const avgConfidence = validFacts.length > 0
+                ? validFacts.reduce((sum: number, f: any) => sum + f.confidence, 0) / validFacts.length
+                : 0;
+
+            if (validFacts.length === 0) {
+                // Track failed extraction
+                this.metricsCollector?.logAudit({
+                    level: 'warning',
+                    component: 'LayeredMemory',
+                    operation: 'fact_extraction',
+                    userId,
+                    genomeId,
+                    message: 'No facts extracted from messages',
+                    duration: Date.now() - startTime,
+                    metadata: {
+                        factsExtracted: 0,
+                        avgConfidence: 0,
+                        success: false,
+                    },
+                });
+                return;
+            }
 
             // Convert to SemanticFact schema
             const now = new Date();
@@ -512,7 +575,47 @@ If no permanent facts found, return: {"facts": []}
             for (const fact of newFacts) {
                 await this.storage.saveFact(fact, userId, genomeId);
             }
+
+            // Track successful extraction
+            const latencyMs = Date.now() - startTime;
+            this.metricsCollector?.logAudit({
+                level: 'info',
+                component: 'LayeredMemory',
+                operation: 'fact_extraction',
+                userId,
+                genomeId,
+                message: `Extracted ${validFacts.length} semantic facts with avg confidence ${avgConfidence.toFixed(2)}`,
+                duration: latencyMs,
+                metadata: {
+                    factsExtracted: validFacts.length,
+                    avgConfidence,
+                    success: true,
+                },
+            });
         } catch (error) {
+            // Track failed extraction
+            this.metricsCollector?.logAudit({
+                level: 'error',
+                component: 'LayeredMemory',
+                operation: 'fact_extraction',
+                userId,
+                genomeId,
+                message: 'Failed to extract semantic facts',
+                duration: Date.now() - startTime,
+                metadata: {
+                    factsExtracted: 0,
+                    success: false,
+                },
+                error: error instanceof Error ? {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                } : {
+                    name: 'UnknownError',
+                    message: String(error),
+                },
+            });
+
             // Silently fail if extraction fails (not critical)
             console.warn('Failed to extract long-term facts:', error);
         }

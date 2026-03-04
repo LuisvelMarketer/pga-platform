@@ -10,7 +10,7 @@
  *
  * @example
  * ```typescript
- * import { OpenAIAdapter } from '@pga/adapters-llm-openai';
+ * import { OpenAIAdapter } from '@pga-ai/adapters-llm-openai';
  *
  * const adapter = new OpenAIAdapter({
  *   apiKey: process.env.OPENAI_API_KEY,
@@ -26,7 +26,7 @@ import type {
     ChatOptions,
     ChatResponse,
     ChatChunk,
-} from '@pga/core';
+} from '@pga-ai/core';
 
 export interface OpenAIAdapterConfig {
     /**

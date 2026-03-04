@@ -10,7 +10,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import figlet from 'figlet';
-import { VERSION } from '@pga/core';
+import { VERSION } from '@pga-ai/core';
 
 const program = new Command();
 

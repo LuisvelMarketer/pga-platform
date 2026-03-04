@@ -173,17 +173,36 @@ export class InMemoryVectorStore implements VectorStoreAdapter {
     }
 
     private simpleEmbedding(text: string): number[] {
-        // Simple hash-based embedding for testing (NOT for production)
+        // Improved keyword-based embedding for testing (NOT for production)
+        // This simulates semantic similarity by extracting keywords
         const dim = 128;
         const embedding = new Array(dim).fill(0);
 
-        for (let i = 0; i < text.length; i++) {
-            const charCode = text.charCodeAt(i);
-            embedding[i % dim] += charCode;
+        // Extract keywords (simple tokenization)
+        const keywords = text.toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(w => w.length > 2); // Filter out short words
+
+        // Create embedding based on keyword hashes
+        for (const word of keywords) {
+            let hash = 0;
+            for (let i = 0; i < word.length; i++) {
+                hash = ((hash << 5) - hash) + word.charCodeAt(i);
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            const index = Math.abs(hash) % dim;
+            embedding[index] += 1;
         }
 
-        // Normalize
+        // Add character-level features for additional signal
+        for (let i = 0; i < text.length && i < 100; i++) {
+            const charCode = text.charCodeAt(i);
+            embedding[(charCode + i) % dim] += 0.1;
+        }
+
+        // Normalize to unit vector
         const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-        return embedding.map(val => val / norm);
+        return norm > 0 ? embedding.map(val => val / norm) : embedding;
     }
 }

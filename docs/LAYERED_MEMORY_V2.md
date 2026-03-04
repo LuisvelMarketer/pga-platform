@@ -287,7 +287,7 @@ facts      summary    messages     → Prompt
 ### Inicialización
 
 ```typescript
-import { PGA, LayeredMemory } from '@pga/core';
+import { PGA, LayeredMemory } from '@pga-ai/core';
 
 const pga = new PGA({
     llm: new ClaudeAdapter({ apiKey: process.env.ANTHROPIC_KEY }),

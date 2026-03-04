@@ -57,6 +57,31 @@ export interface GenomeConfig {
         defaultStrategy?: 'direct' | 'chain-of-thought' | 'self-consistency' | 'tree-of-thoughts' | 'reflection' | 'auto';
         showSteps?: boolean;
     };
+
+    // Token Compression (v0.4.0)
+    compression?: CompressionConfig;
+
+    // Autonomous Agent (v0.5.0) — Living Agent capabilities
+    autonomous?: AutonomousConfig;
+}
+
+/**
+ * Compression Config — Evolutionary token compression settings
+ *
+ * Controls token budget enforcement, auto-compression triggers,
+ * and compression safety thresholds.
+ */
+export interface CompressionConfig {
+    /** Token budget for C1 operative genes (default: 2000) */
+    c1TokenBudget?: number;
+    /** Auto-compress when total C1 tokens exceed this (default: 1600 = 80% of budget) */
+    autoCompressThreshold?: number;
+    /** Minimum gene fitness to be eligible for compression (default: 0.3) */
+    minFitnessForCompression?: number;
+    /** Maximum compression ratio allowed — lower = more aggressive (default: 0.3, meaning at most 70% reduction) */
+    maxCompressionRatio?: number;
+    /** Enable auto-compression on drift detection (default: true) */
+    enableAutoCompress?: boolean;
 }
 
 /**
@@ -94,8 +119,61 @@ export interface GeneAllele {
     sandboxTested?: boolean;
     sandboxScore?: number;
     recentScores?: number[];
+    publishedToSwarm?: boolean;
     status: 'active' | 'retired';
     createdAt: Date;
+}
+
+/**
+ * Autonomous Agent Config — Living Agent capabilities (v0.5.0)
+ *
+ * All features are opt-in. When enabled, agents gain autonomous
+ * self-evolution, metacognition, pattern prediction, and swarm intelligence.
+ */
+export interface AutonomousConfig {
+    /** Enable Genesis Bootstrap — seed from Gene Bank at creation (default: false) */
+    genesisBootstrap?: boolean;
+    /** Minimum fitness to adopt a gene from Gene Bank during bootstrap (default: 0.7) */
+    bootstrapMinFitness?: number;
+
+    /** Enable Continuous Evolution Loop (default: false) */
+    continuousEvolution?: boolean;
+    /** Evolve every N interactions (default: 10) */
+    evolveEveryN?: number;
+    /** Auto-mutate when drift detected (default: true) */
+    autoMutateOnDrift?: boolean;
+    /** Auto-compress when token pressure detected (default: true) */
+    autoCompressOnPressure?: boolean;
+
+    /** Enable SelfModel — agent self-awareness (default: false) */
+    enableSelfModel?: boolean;
+
+    /** Enable Pattern Memory — predictive patterns (default: false) */
+    enablePatternMemory?: boolean;
+    /** Max patterns to track (default: 50) */
+    maxPatterns?: number;
+
+    /** Enable Swarm Intelligence — auto gene sharing (default: false) */
+    enableSwarm?: boolean;
+    /** Auto-publish genes when fitness exceeds this (default: 0.85) */
+    autoPublishThreshold?: number;
+    /** Auto-import genes when drift severity reaches this (default: 'severe') */
+    autoImportOnDrift?: 'moderate' | 'severe' | 'critical';
+
+    /** Enable Metacognition — pre/post response analysis (default: false) */
+    enableMetacognition?: boolean;
+
+    /** Enable Emotional Model — computational empathy (default: false) */
+    enableEmotionalModel?: boolean;
+
+    /** Enable Calibrated Autonomy — adaptive decision authority (default: false) */
+    enableCalibratedAutonomy?: boolean;
+
+    /** Enable Personal Narrative — relationship memory (default: false) */
+    enablePersonalNarrative?: boolean;
+
+    /** Enable Analytic Memory — knowledge graph (default: false) */
+    enableAnalyticMemory?: boolean;
 }
 
 // ─── User DNA Types ─────────────────────────────────────

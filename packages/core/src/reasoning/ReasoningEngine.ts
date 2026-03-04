@@ -13,6 +13,7 @@
  */
 
 import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
+import type { MetricsCollector } from '../monitoring/MetricsCollector.js';
 
 // ─── Reasoning Types ───────────────────────────────────────
 
@@ -70,7 +71,11 @@ export interface ReasoningConfig {
 export class ReasoningEngine {
     private config: ReasoningConfig;
 
-    constructor(private llm: LLMAdapter, config?: Partial<ReasoningConfig>) {
+    constructor(
+        private llm: LLMAdapter,
+        config?: Partial<ReasoningConfig>,
+        private metricsCollector?: MetricsCollector
+    ) {
         this.config = {
             defaultStrategy: config?.defaultStrategy || 'chain-of-thought',
             chainOfThought: {
@@ -113,33 +118,78 @@ export class ReasoningEngine {
         const selectedStrategy = strategy || this.config.defaultStrategy;
         const startTime = Date.now();
 
-        let result: ReasoningResult;
+        try {
+            let result: ReasoningResult;
 
-        switch (selectedStrategy) {
-            case 'direct':
-                result = await this.directReasoning(question, context);
-                break;
-            case 'chain-of-thought':
-                result = await this.chainOfThoughtReasoning(question, context);
-                break;
-            case 'self-consistency':
-                result = await this.selfConsistencyReasoning(question, context);
-                break;
-            case 'tree-of-thoughts':
-                result = await this.treeOfThoughtsReasoning(question, context);
-                break;
-            case 'reflection':
-                result = await this.reflectionReasoning(question, context);
-                break;
-            case 'auto':
-                result = await this.autoSelectStrategy(question, context);
-                break;
-            default:
-                result = await this.chainOfThoughtReasoning(question, context);
+            switch (selectedStrategy) {
+                case 'direct':
+                    result = await this.directReasoning(question, context);
+                    break;
+                case 'chain-of-thought':
+                    result = await this.chainOfThoughtReasoning(question, context);
+                    break;
+                case 'self-consistency':
+                    result = await this.selfConsistencyReasoning(question, context);
+                    break;
+                case 'tree-of-thoughts':
+                    result = await this.treeOfThoughtsReasoning(question, context);
+                    break;
+                case 'reflection':
+                    result = await this.reflectionReasoning(question, context);
+                    break;
+                case 'auto':
+                    result = await this.autoSelectStrategy(question, context);
+                    break;
+                default:
+                    result = await this.chainOfThoughtReasoning(question, context);
+            }
+
+            result.durationMs = Date.now() - startTime;
+
+            // Track metrics
+            this.metricsCollector?.logAudit({
+                level: 'info',
+                component: 'ReasoningEngine',
+                operation: 'reason',
+                message: `Completed ${result.strategy} reasoning`,
+                duration: result.durationMs,
+                metadata: {
+                    strategy: result.strategy,
+                    questionLength: question.length,
+                    contextLength: context.length,
+                    confidence: result.confidence,
+                    tokensUsed: result.tokensUsed,
+                    reasoningSteps: result.reasoning.length,
+                    answerLength: result.answer.length,
+                },
+            });
+
+            return result;
+        } catch (error) {
+            const duration = Date.now() - startTime;
+
+            this.metricsCollector?.logAudit({
+                level: 'error',
+                component: 'ReasoningEngine',
+                operation: 'reason',
+                message: 'Failed to complete reasoning',
+                duration,
+                metadata: {
+                    strategy: selectedStrategy,
+                    questionLength: question.length,
+                },
+                error: error instanceof Error ? {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                } : {
+                    name: 'UnknownError',
+                    message: String(error),
+                },
+            });
+
+            throw error;
         }
-
-        result.durationMs = Date.now() - startTime;
-        return result;
     }
 
     // ─── Reasoning Strategies ──────────────────────────────────

@@ -77,12 +77,12 @@ function checkTypeScript() {
 
 function checkPGACore() {
     try {
-        require.resolve('@pga/core');
+        require.resolve('@pga-ai/core');
         return { success: true };
     } catch {
         return {
             success: false,
-            message: '@pga/core not found. Run: npm install @pga/core',
+            message: '@pga-ai/core not found. Run: npm install @pga-ai/core',
         };
     }
 }

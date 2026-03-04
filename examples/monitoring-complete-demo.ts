@@ -15,7 +15,7 @@
  * @since 2026-02-27
  */
 
-import { MetricsCollector, MonitoringDashboard } from '@pga/core';
+import { MetricsCollector, MonitoringDashboard } from '@pga-ai/core';
 
 async function completeMonitoringDemo() {
     console.log('╔═══════════════════════════════════════════════════════════════╗');

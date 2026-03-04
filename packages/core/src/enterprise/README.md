@@ -16,7 +16,7 @@ Prevent abuse and ensure fair resource allocation with multiple algorithms.
 ### Quick Start
 
 ```typescript
-import { RateLimiter } from '@pga/core';
+import { RateLimiter } from '@pga-ai/core';
 
 const limiter = new RateLimiter({
   maxRequests: 100,
@@ -143,7 +143,7 @@ Comprehensive RBAC system with policy-based access control.
 ### Quick Start
 
 ```typescript
-import { AuthManager } from '@pga/core';
+import { AuthManager } from '@pga-ai/core';
 
 const auth = new AuthManager({
   defaultRole: 'user',
@@ -285,7 +285,7 @@ const companyAUsers = auth.getUsersByTenant('company-a');
 ### Express.js Middleware
 
 ```typescript
-import { RateLimiter, AuthManager } from '@pga/core';
+import { RateLimiter, AuthManager } from '@pga-ai/core';
 
 const limiter = new RateLimiter({
   maxRequests: 100,
@@ -342,7 +342,7 @@ app.post('/genome/:id/evolve', async (req, res) => {
 ### PGA Integration
 
 ```typescript
-import { PGA, RateLimiter, AuthManager } from '@pga/core';
+import { PGA, RateLimiter, AuthManager } from '@pga-ai/core';
 
 const pga = new PGA({
   llmAdapter: new ClaudeAdapter({

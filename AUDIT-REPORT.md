@@ -235,11 +235,11 @@ export class PGA {
 ```
 
 **Packages:**
-- ✅ @pga/core
-- ✅ @pga/adapters-llm-anthropic
-- ✅ @pga/adapters-llm-openai
-- ✅ @pga/adapters-storage-postgres
-- ✅ @pga/cli
+- ✅ @pga-ai/core
+- ✅ @pga-ai/adapters-llm-anthropic
+- ✅ @pga-ai/adapters-llm-openai
+- ✅ @pga-ai/adapters-storage-postgres
+- ✅ @pga-ai/cli
 
 ### Test Status: 🟡 95% PASSING
 ```
@@ -266,7 +266,7 @@ Pass Rate:   95%
 #### 1. TypeScript Compilation Errors (FIXED)
 **Before:**
 ```
-@pga/core:build: ERROR
+@pga-ai/core:build: ERROR
 src/core/GenomeKernel.ts(23,5): error TS6196: 'IntegrityMetadata' is declared but never used.
 src/core/GenomeKernel.ts(24,5): error TS6196: 'FitnessVector' is declared but never used.
 ...
@@ -294,7 +294,7 @@ Missing properties: getMutationHistory, getGeneMutationHistory, getRecentInterac
 
 **After:**
 ```
-• @pga/adapters-storage-postgres: BUILD SUCCESS
+• @pga-ai/adapters-storage-postgres: BUILD SUCCESS
 ```
 
 **Actions Taken:**

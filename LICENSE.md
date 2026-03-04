@@ -11,10 +11,10 @@ PGA Platform uses a **multi-tier licensing model** to balance open-source commun
 
 | Package/Component | License | Usage |
 |-------------------|---------|-------|
-| `@pga/core` | **MIT License** | Free, open source, commercial use allowed |
-| `@pga/adapters-llm` | **MIT License** | Free, open source, commercial use allowed |
-| `@pga/adapters-storage` | **MIT License** | Free, open source, commercial use allowed |
-| `@pga/cli` | **MIT License** | Free, open source, commercial use allowed |
+| `@pga-ai/core` | **MIT License** | Free, open source, commercial use allowed |
+| `@pga-ai/adapters-llm` | **MIT License** | Free, open source, commercial use allowed |
+| `@pga-ai/adapters-storage` | **MIT License** | Free, open source, commercial use allowed |
+| `@pga-ai/cli` | **MIT License** | Free, open source, commercial use allowed |
 | **Gene Registry** | **BSL 1.1** | Business Source License (see below) |
 | **PGA Cloud (SaaS)** | **Proprietary** | Commercial license required |
 | **Enterprise Features** | **Proprietary** | Commercial license required |
@@ -23,7 +23,7 @@ PGA Platform uses a **multi-tier licensing model** to balance open-source commun
 
 ## 1️⃣ Open Source Components (MIT License)
 
-### Packages: `@pga/core`, `@pga/adapters-*`, `@pga/cli`
+### Packages: `@pga-ai/core`, `@pga-ai/adapters-*`, `@pga-ai/cli`
 
 ```
 MIT License

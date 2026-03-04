@@ -1,5 +1,5 @@
 {
-  "name": "@pga/adapters-storage-postgres",
+  "name": "@pga-ai/adapters-storage-postgres",
   "version": "0.1.0",
   "description": "PostgreSQL storage adapter for PGA",
   "author": "Luis Alfredo Velasquez Duran <contact@pga.ai>",
@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "pg": "^8.13.1",
-    "@pga/core": "*"
+    "@pga-ai/core": "*"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",

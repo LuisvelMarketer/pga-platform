@@ -330,7 +330,7 @@ PGA attacks that **$42B "failure market"**.
 - 🎯 100 developers on waitlist
 
 ### Q2-Q3 2025 (Months 4-9) - Expansion
-- 🚀 Public launch of @pga/core
+- 🚀 Public launch of @pga-ai/core
 - 🚀 PGA Cloud Dashboard (Beta)
 - 🚀 10 enterprise beta customers
 - 🚀 1,000 NPM installs/week

@@ -387,7 +387,7 @@ import {
   MutationEngine,
   FitnessCalculator,
   PromotionGate,
-} from '@pga/core';
+} from '@pga-ai/core';
 
 // 1. Initialize Living OS
 const pga = new PGA({ llm, storage });

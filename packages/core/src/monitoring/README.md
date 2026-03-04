@@ -14,7 +14,7 @@ Enterprise-grade monitoring and observability for PGA (Genomic Self-Evolving Pro
 ## Quick Start
 
 ```typescript
-import { MetricsCollector } from '@pga/core';
+import { MetricsCollector } from '@pga-ai/core';
 
 const metrics = new MetricsCollector({
   alertThresholds: {

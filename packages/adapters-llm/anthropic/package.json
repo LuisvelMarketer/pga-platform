@@ -1,5 +1,5 @@
 {
-  "name": "@pga/adapters-llm-anthropic",
+  "name": "@pga-ai/adapters-llm-anthropic",
   "version": "0.1.0",
   "description": "Anthropic Claude adapter for PGA",
   "author": "Luis Alfredo Velasquez Duran <contact@pga.ai>",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
-    "@pga/core": "*"
+    "@pga-ai/core": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

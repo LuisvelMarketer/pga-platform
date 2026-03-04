@@ -177,11 +177,11 @@ await genome.chat(message, { userId: 'user-123' });
 - 👤 **User DNA profiling** (cognitive traits, communication style, expertise)
 
 #### Adapters
-- 🤖 **Anthropic Claude adapter** (@pga/adapters-llm-anthropic)
+- 🤖 **Anthropic Claude adapter** (@pga-ai/adapters-llm-anthropic)
   - Support for Claude Opus 4 and Sonnet 4
   - Streaming capabilities
   - Complete LLMAdapter interface
-- 🗄️ **PostgreSQL storage adapter** (@pga/adapters-storage-postgres)
+- 🗄️ **PostgreSQL storage adapter** (@pga-ai/adapters-storage-postgres)
   - 7-table schema
   - Transaction support
   - Connection pooling
@@ -257,8 +257,8 @@ await genome.chat(message, { userId: 'user-123' });
 
 ## License
 
-- **@pga/core**: MIT License (free forever)
-- **@pga/plugins**: Commercial License (coming soon)
+- **@pga-ai/core**: MIT License (free forever)
+- **@pga-ai/plugins**: Commercial License (coming soon)
 - **PGA Cloud**: SaaS (coming soon)
 
 See [LICENSE](./LICENSE) for details.

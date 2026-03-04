@@ -12,7 +12,7 @@ import type {
     ChatOptions,
     ChatResponse,
     ChatChunk,
-} from '@pga/core';
+} from '@pga-ai/core';
 
 export interface ClaudeAdapterConfig {
     /**
@@ -41,7 +41,7 @@ export interface ClaudeAdapterConfig {
  *
  * @example
  * ```typescript
- * import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
+ * import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
  *
  * const adapter = new ClaudeAdapter({
  *   apiKey: process.env.ANTHROPIC_API_KEY,

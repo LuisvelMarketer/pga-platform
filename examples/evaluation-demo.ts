@@ -4,10 +4,10 @@
  * This example shows how to use the Evaluator to prove PGA superiority.
  */
 
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
-import { Evaluator, STANDARD_TASKS } from '@pga/core/evaluation/Evaluator';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
+import { Evaluator, STANDARD_TASKS } from '@pga-ai/core/evaluation/Evaluator';
 
 async function main() {
     console.log('\n🔬 PGA EVALUATION FRAMEWORK DEMO\n');

@@ -98,7 +98,7 @@
 ```
 pga-platform/
 ├── packages/
-│   ├── core/                          # @pga/core (MIT License)
+│   ├── core/                          # @pga-ai/core (MIT License)
 │   │   ├── src/
 │   │   │   ├── types/GenomeV2.ts      # Living OS v2.0.0 types
 │   │   │   ├── core/GenomeKernel.ts   # Core implementation
@@ -328,11 +328,11 @@ Example: `examples/monitoring-demo.ts`
 ### Supported LLMs:
 1. **Anthropic Claude** (primary)
    - Sonnet 4.5, Opus 4.6, Haiku 4.5
-   - Adapter: `@pga/adapters-llm-anthropic`
+   - Adapter: `@pga-ai/adapters-llm-anthropic`
 
 2. **OpenAI** (secondary)
    - GPT-4, GPT-4-Turbo, GPT-3.5-Turbo
-   - Adapter: `@pga/adapters-llm-openai`
+   - Adapter: `@pga-ai/adapters-llm-openai`
 
 ### Adding New Model Adapters:
 - Implement `LLMAdapter` interface

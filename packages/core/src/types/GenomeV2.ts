@@ -124,6 +124,18 @@ export interface OperativeGene {
     usageCount: number;
     lastUsed: Date;
     successRate: number;
+
+    // Token tracking (used by evolutionary compression)
+    tokenCount?: number;
+
+    // Evolution tracking (used by Evolution Boost)
+    version?: number;
+    lastModified?: Date;
+    mutationHistory?: Array<{
+        operation: string;
+        timestamp: Date;
+        reason: string;
+    }>;
 }
 
 export type GeneCategory =
@@ -286,7 +298,11 @@ export type MutationType =
     | 'inherit_gene'
     | 'rollback'
     | 'manual_edit'
-    | 'emergency_fix';
+    | 'emergency_fix'
+    | 'semantic_restructuring'
+    | 'pattern_extraction'
+    | 'crossover_mutation'
+    | 'breakthrough';
 
 // ─── Multi-Objective Fitness ────────────────────────────────
 

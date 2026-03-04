@@ -99,8 +99,8 @@ async function createProjectStructure(
             start: 'node dist/index.js',
         },
         dependencies: {
-            '@pga/core': '^0.1.0',
-            '@pga/adapters-llm-anthropic': '^0.1.0',
+            '@pga-ai/core': '^0.1.0',
+            '@pga-ai/adapters-llm-anthropic': '^0.1.0',
         },
         devDependencies: {
             typescript: '^5.4.5',
@@ -111,11 +111,11 @@ async function createProjectStructure(
 
     // Add dependencies based on template
     if (template === 'advanced' || template === 'enterprise') {
-        packageJson.dependencies['@pga/adapters-llm-openai'] = '^0.1.0';
+        packageJson.dependencies['@pga-ai/adapters-llm-openai'] = '^0.1.0';
     }
 
     if (template === 'enterprise') {
-        packageJson.dependencies['@pga/adapters-storage-postgres'] = '^0.1.0';
+        packageJson.dependencies['@pga-ai/adapters-storage-postgres'] = '^0.1.0';
     }
 
     await fs.writeFile(
@@ -193,8 +193,8 @@ function getMainTemplate(template: string): string {
  * Basic PGA Application
  */
 
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
 
 async function main() {
     // Initialize PGA
@@ -236,9 +236,9 @@ main().catch(console.error);
  * Includes monitoring and multi-model support
  */
 
-import { PGA, MetricsCollector } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { OpenAIAdapter } from '@pga/adapters-llm-openai';
+import { PGA, MetricsCollector } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { OpenAIAdapter } from '@pga-ai/adapters-llm-openai';
 
 async function main() {
     // Initialize metrics collector
@@ -325,10 +325,10 @@ main().catch(console.error);
  * Production-ready with PostgreSQL, monitoring, and multi-model support
  */
 
-import { PGA, MetricsCollector, Evaluator } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { OpenAIAdapter } from '@pga/adapters-llm-openai';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
+import { PGA, MetricsCollector, Evaluator } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { OpenAIAdapter } from '@pga-ai/adapters-llm-openai';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
 
 async function main() {
     // Initialize storage

@@ -16,6 +16,7 @@
 
 import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
 import type { VectorStoreAdapter } from './VectorStoreAdapter.js';
+import type { MetricsCollector } from '../monitoring/MetricsCollector.js';
 
 // ─── RAG Types ─────────────────────────────────────────────
 
@@ -70,7 +71,8 @@ export class RAGEngine {
 
     constructor(
         private llm: LLMAdapter,
-        config: RAGConfig
+        config: RAGConfig,
+        private metricsCollector?: MetricsCollector
     ) {
         this.config = config;
     }
@@ -79,17 +81,57 @@ export class RAGEngine {
      * Retrieve relevant documents for a query
      */
     async retrieve(query: string): Promise<RAGSearchResult[]> {
-        // Generate embedding for query
-        const queryEmbedding = await this.generateEmbedding(query);
+        const startTime = Date.now();
 
-        // Search vector store
-        const results = await this.config.vectorStore.search(queryEmbedding, {
-            topK: this.config.search.topK,
-            minScore: this.config.search.minScore,
-        });
+        try {
+            // Generate embedding for query
+            const queryEmbedding = await this.generateEmbedding(query);
 
-        // Filter by minimum score
-        return results.filter(r => r.score >= this.config.search.minScore);
+            // Search vector store
+            const results = await this.config.vectorStore.search(queryEmbedding, {
+                topK: this.config.search.topK,
+                minScore: this.config.search.minScore,
+            });
+
+            // Filter by minimum score
+            const filteredResults = results.filter(r => r.score >= this.config.search.minScore);
+
+            // Track metrics
+            this.metricsCollector?.logAudit({
+                level: 'info',
+                component: 'RAGEngine',
+                operation: 'retrieve',
+                message: `Retrieved ${filteredResults.length} documents for query`,
+                duration: Date.now() - startTime,
+                metadata: {
+                    queryLength: query.length,
+                    resultsFound: filteredResults.length,
+                    topK: this.config.search.topK,
+                    avgScore: filteredResults.length > 0
+                        ? filteredResults.reduce((sum, r) => sum + r.score, 0) / filteredResults.length
+                        : 0,
+                },
+            });
+
+            return filteredResults;
+        } catch (error) {
+            this.metricsCollector?.logAudit({
+                level: 'error',
+                component: 'RAGEngine',
+                operation: 'retrieve',
+                message: 'Failed to retrieve documents',
+                duration: Date.now() - startTime,
+                error: error instanceof Error ? {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                } : {
+                    name: 'UnknownError',
+                    message: String(error),
+                },
+            });
+            throw error;
+        }
     }
 
     /**
@@ -146,18 +188,56 @@ export class RAGEngine {
      * Index multiple documents in batch
      */
     async indexDocuments(documents: RAGDocument[]): Promise<void> {
-        // Generate embeddings for documents without them
-        const documentsWithEmbeddings = await Promise.all(
-            documents.map(async doc => {
-                if (!doc.embedding) {
-                    doc.embedding = await this.generateEmbedding(doc.content);
-                }
-                return doc;
-            })
-        );
+        const startTime = Date.now();
 
-        // Batch upsert
-        await this.config.vectorStore.upsert(documentsWithEmbeddings);
+        try {
+            // Generate embeddings for documents without them
+            const documentsWithEmbeddings = await Promise.all(
+                documents.map(async doc => {
+                    if (!doc.embedding) {
+                        doc.embedding = await this.generateEmbedding(doc.content);
+                    }
+                    return doc;
+                })
+            );
+
+            // Batch upsert
+            await this.config.vectorStore.upsert(documentsWithEmbeddings);
+
+            // Track metrics
+            this.metricsCollector?.logAudit({
+                level: 'info',
+                component: 'RAGEngine',
+                operation: 'index_documents',
+                message: `Indexed ${documents.length} documents`,
+                duration: Date.now() - startTime,
+                metadata: {
+                    documentsIndexed: documents.length,
+                    embeddingsGenerated: documents.filter(d => !d.embedding).length,
+                    avgContentLength: documents.reduce((sum, d) => sum + d.content.length, 0) / documents.length,
+                },
+            });
+        } catch (error) {
+            this.metricsCollector?.logAudit({
+                level: 'error',
+                component: 'RAGEngine',
+                operation: 'index_documents',
+                message: 'Failed to index documents',
+                duration: Date.now() - startTime,
+                metadata: {
+                    documentsAttempted: documents.length,
+                },
+                error: error instanceof Error ? {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                } : {
+                    name: 'UnknownError',
+                    message: String(error),
+                },
+            });
+            throw error;
+        }
     }
 
     /**

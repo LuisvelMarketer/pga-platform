@@ -1,4 +1,4 @@
-# @pga/cli
+# @pga-ai/cli
 
 Interactive command-line interface for PGA (Genomic Self-Evolving Prompts).
 
@@ -7,13 +7,13 @@ Interactive command-line interface for PGA (Genomic Self-Evolving Prompts).
 ### Global Installation (Recommended)
 
 ```bash
-npm install -g @pga/cli
+npm install -g @pga-ai/cli
 ```
 
 ### Local Installation
 
 ```bash
-npm install --save-dev @pga/cli
+npm install --save-dev @pga-ai/cli
 ```
 
 ## Quick Start
@@ -189,8 +189,8 @@ Simple PGA setup for getting started quickly.
 - Example chat implementation
 
 ```typescript
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
 
 const pga = new PGA({
   llmAdapter: new ClaudeAdapter({
@@ -211,9 +211,9 @@ Multi-model support with monitoring.
 - Alert configuration
 
 ```typescript
-import { PGA, MetricsCollector } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { OpenAIAdapter } from '@pga/adapters-llm-openai';
+import { PGA, MetricsCollector } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { OpenAIAdapter } from '@pga-ai/adapters-llm-openai';
 
 const metrics = new MetricsCollector({
   alertThresholds: {
@@ -236,9 +236,9 @@ Production-ready with all features.
 - Graceful shutdown handling
 
 ```typescript
-import { PGA, MetricsCollector, Evaluator } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
+import { PGA, MetricsCollector, Evaluator } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
 
 const storage = new PostgresAdapter({
   connectionString: process.env.DATABASE_URL!,
@@ -385,17 +385,17 @@ pga doctor
 
 ```bash
 # Ensure global installation
-npm install -g @pga/cli
+npm install -g @pga-ai/cli
 
 # Or use npx
-npx @pga/cli init
+npx @pga-ai/cli init
 ```
 
 ### Permission Errors
 
 ```bash
 # macOS/Linux
-sudo npm install -g @pga/cli
+sudo npm install -g @pga-ai/cli
 
 # Or use user directory
 npm config set prefix ~/.npm-global

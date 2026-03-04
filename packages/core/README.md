@@ -1,15 +1,15 @@
-# @pga/core
+# @pga-ai/core
 
 > 🧬 **Genomic Self-Evolving Prompts** — Core Engine
 
-[![npm version](https://img.shields.io/npm/v/@pga/core)](https://www.npmjs.com/package/@pga/core)
+[![npm version](https://img.shields.io/npm/v/@pga-ai/core)](https://www.npmjs.com/package/@pga-ai/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Created by Luis Alfredo Velasquez Duran | Germany, 2025**
 
 ---
 
-## What is @pga/core?
+## What is @pga-ai/core?
 
 The core engine for PGA (Genomic Self-Evolving Prompts) — the world's first system that makes AI prompts **evolve automatically** like biological organisms.
 
@@ -23,21 +23,21 @@ Instead of manually tweaking prompts, PGA:
 ## Installation
 
 ```bash
-npm install @pga/core
+npm install @pga-ai/core
 ```
 
 You'll also need adapters for your LLM and database:
 
 ```bash
-npm install @pga/adapters-llm @pga/adapters-storage
+npm install @pga-ai/adapters-llm @pga-ai/adapters-storage
 ```
 
 ## Quick Start
 
 ```typescript
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm/anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage/postgres';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm/anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage/postgres';
 
 // 1. Initialize PGA
 const pga = new PGA({
@@ -222,7 +222,7 @@ await genome.recordFeedback('user123', 'communication-style', 'positive');
 Implement `LLMAdapter` interface:
 
 ```typescript
-import type { LLMAdapter } from '@pga/core';
+import type { LLMAdapter } from '@pga-ai/core';
 
 export class MyLLMAdapter implements LLMAdapter {
   readonly name = 'my-llm';
@@ -235,17 +235,17 @@ export class MyLLMAdapter implements LLMAdapter {
 ```
 
 Available adapters:
-- `@pga/adapters-llm/anthropic` - Claude
-- `@pga/adapters-llm/openai` - GPT
-- `@pga/adapters-llm/google` - Gemini
-- `@pga/adapters-llm/local` - Ollama
+- `@pga-ai/adapters-llm/anthropic` - Claude
+- `@pga-ai/adapters-llm/openai` - GPT
+- `@pga-ai/adapters-llm/google` - Gemini
+- `@pga-ai/adapters-llm/local` - Ollama
 
 ### Storage Adapters
 
 Implement `StorageAdapter` interface:
 
 ```typescript
-import type { StorageAdapter } from '@pga/core';
+import type { StorageAdapter } from '@pga-ai/core';
 
 export class MyStorageAdapter implements StorageAdapter {
   async initialize() { /* ... */ }
@@ -256,10 +256,10 @@ export class MyStorageAdapter implements StorageAdapter {
 ```
 
 Available adapters:
-- `@pga/adapters-storage/postgres`
-- `@pga/adapters-storage/mongodb`
-- `@pga/adapters-storage/redis`
-- `@pga/adapters-storage/sqlite`
+- `@pga-ai/adapters-storage/postgres`
+- `@pga-ai/adapters-storage/mongodb`
+- `@pga-ai/adapters-storage/redis`
+- `@pga-ai/adapters-storage/sqlite`
 
 ## Examples
 

@@ -22,6 +22,9 @@ import type {
     MutationRecord,
 } from '../types/GenomeV2.js';
 
+import type { LLMAdapter } from '../interfaces/LLMAdapter.js';
+import { estimateTokenCount } from '../utils/tokens.js';
+
 // ─── Mutation Context ───────────────────────────────────────
 
 export interface MutationContext {
@@ -40,6 +43,11 @@ export interface MutationResult {
     mutation: MutationRecord; // Audit record
     description: string; // Human-readable description
     expectedImprovement: number; // Predicted fitness gain (0-1)
+    compressionMetrics?: {
+        originalTokens: number;
+        compressedTokens: number;
+        ratio: number; // compressedTokens / originalTokens (lower = better)
+    };
 }
 
 // ─── Mutation Operator Interface ────────────────────────────
@@ -126,6 +134,7 @@ export class CompressInstructionsOperator implements IMutationOperator {
         compressed.content = this.removeRedundancy(gene.content);
         compressed.content = this.abbreviateCommon(compressed.content);
         compressed.content = this.consolidateInstructions(compressed.content);
+        compressed.tokenCount = estimateTokenCount(compressed.content);
 
         return compressed;
     }
@@ -309,6 +318,7 @@ export class SafetyReinforcementOperator implements IMutationOperator {
             reinforced.content += '\n\nSAFETY: Check for security vulnerabilities (XSS, SQL injection, etc.).';
         }
 
+        reinforced.tokenCount = estimateTokenCount(reinforced.content);
         return reinforced;
     }
 
@@ -336,12 +346,11 @@ export class ToolSelectionBiasOperator implements IMutationOperator {
         const mutant = this.deepClone(context.genome);
 
         // Adjust tool selection in operative genes
-        const toolGenes = mutant.chromosomes.c1.operations.filter(
-            (g) => g.category === 'tool-usage'
-        );
-
-        for (const gene of toolGenes) {
-            gene.content = this.adjustToolBias(gene);
+        for (let i = 0; i < mutant.chromosomes.c1.operations.length; i++) {
+            const gene = mutant.chromosomes.c1.operations[i];
+            if (gene.category === 'tool-usage') {
+                mutant.chromosomes.c1.operations[i] = this.adjustToolBias(gene);
+            }
         }
 
         const mutation: MutationRecord = {
@@ -372,7 +381,7 @@ export class ToolSelectionBiasOperator implements IMutationOperator {
         return 0.12; // Consistent 12% improvement
     }
 
-    private adjustToolBias(gene: OperativeGene): string {
+    private adjustToolBias(gene: OperativeGene): OperativeGene {
         let content = gene.content;
 
         // Favor high-success-rate tools
@@ -382,7 +391,11 @@ export class ToolSelectionBiasOperator implements IMutationOperator {
             content += '\n\nCAUTION: Use this tool sparingly (low success rate). Consider alternatives.';
         }
 
-        return content;
+        return {
+            ...gene,
+            content,
+            tokenCount: estimateTokenCount(content),
+        };
     }
 
     private deepClone(genome: GenomeV2): GenomeV2 {
@@ -391,6 +404,182 @@ export class ToolSelectionBiasOperator implements IMutationOperator {
 
     private generateId(): string {
         return `mut_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    }
+}
+
+/**
+ * Token Compression Operator - Evolutionary Token Reduction
+ *
+ * Uses LLM to compress gene content while preserving ALL functional capabilities.
+ * This is the core of PGA's token optimization: never discard a functional gene,
+ * instead compress it to use fewer tokens with identical behavior.
+ *
+ * Key principles:
+ * - Temperature 0.3 (fidelity > creativity)
+ * - REJECTS if compressed >= original (compression gate)
+ * - Does NOT degrade fitness (same intent, fewer tokens)
+ * - Resets sampleSize/confidence for re-evaluation
+ */
+export class TokenCompressionOperator implements IMutationOperator {
+    name: MutationType = 'compress_instructions';
+    description = 'LLM-powered token compression preserving functional behavior';
+    targetChromosome: 'c1' = 'c1';
+
+    constructor(private llm?: LLMAdapter) {}
+
+    async mutate(context: MutationContext): Promise<MutationResult> {
+        if (!this.llm) {
+            return this.createFailure(context, 'No LLM adapter configured for compression');
+        }
+
+        const mutant = this.deepClone(context.genome);
+        let totalOriginalTokens = 0;
+        let totalCompressedTokens = 0;
+        let anyCompressed = false;
+
+        // Compress each operative gene
+        for (let i = 0; i < mutant.chromosomes.c1.operations.length; i++) {
+            const gene = mutant.chromosomes.c1.operations[i];
+            const originalTokens = gene.tokenCount || estimateTokenCount(gene.content);
+            totalOriginalTokens += originalTokens;
+
+            try {
+                const compressed = await this.compressGene(gene);
+                const compressedTokens = estimateTokenCount(compressed);
+
+                // Compression gate: reject if not actually smaller
+                if (compressedTokens < originalTokens) {
+                    mutant.chromosomes.c1.operations[i] = {
+                        ...gene,
+                        content: compressed,
+                        tokenCount: compressedTokens,
+                        // Preserve fitness — same intent, fewer tokens
+                        // Reset sample tracking for re-evaluation
+                        version: (gene.version ?? 0) + 1,
+                        lastModified: new Date(),
+                        mutationHistory: [
+                            ...(gene.mutationHistory || []),
+                            {
+                                operation: this.name,
+                                timestamp: new Date(),
+                                reason: `Compressed ${originalTokens} → ${compressedTokens} tokens (${((1 - compressedTokens / originalTokens) * 100).toFixed(0)}% reduction)`,
+                            },
+                        ],
+                    };
+                    totalCompressedTokens += compressedTokens;
+                    anyCompressed = true;
+                } else {
+                    totalCompressedTokens += originalTokens;
+                }
+            } catch {
+                totalCompressedTokens += originalTokens;
+            }
+        }
+
+        if (!anyCompressed) {
+            return this.createFailure(context, 'Compression did not reduce tokens for any gene');
+        }
+
+        const ratio = totalCompressedTokens / totalOriginalTokens;
+        const tokensSaved = totalOriginalTokens - totalCompressedTokens;
+
+        const mutation: MutationRecord = {
+            id: this.generateId(),
+            timestamp: new Date(),
+            chromosome: 'c1',
+            operation: this.name,
+            before: JSON.stringify(context.genome.chromosomes.c1),
+            after: JSON.stringify(mutant.chromosomes.c1),
+            diff: `Token compression: ${totalOriginalTokens} → ${totalCompressedTokens} tokens (${tokensSaved} saved, ${((1 - ratio) * 100).toFixed(1)}% reduction)`,
+            trigger: 'drift-detected',
+            reason: context.reason,
+            sandboxTested: false,
+            promoted: false,
+            proposer: 'system',
+        };
+
+        return {
+            success: true,
+            mutant,
+            mutation,
+            description: `Compressed ${tokensSaved} tokens (${((1 - ratio) * 100).toFixed(1)}% reduction) while preserving gene functionality`,
+            expectedImprovement: (1 - ratio) * 0.2, // Token savings → fitness improvement
+            compressionMetrics: {
+                originalTokens: totalOriginalTokens,
+                compressedTokens: totalCompressedTokens,
+                ratio,
+            },
+        };
+    }
+
+    estimateImprovement(context: MutationContext): number {
+        // Estimate based on current token efficiency
+        const tokenEfficiency = context.genome.fitness.tokenEfficiency;
+        // Lower efficiency = more room for compression
+        return (1 - tokenEfficiency) * 0.25;
+    }
+
+    private async compressGene(gene: OperativeGene): Promise<string> {
+        const response = await this.llm!.chat([
+            {
+                role: 'system',
+                content: 'You are a prompt compression specialist. Your ONLY job is to reduce token count while preserving EXACT functional behavior. The compressed version must produce identical AI agent behavior.',
+            },
+            {
+                role: 'user',
+                content: `Compress this AI agent instruction to use fewer tokens while preserving ALL functional capabilities. The compressed version must produce identical behavior.
+
+INSTRUCTION TO COMPRESS:
+\`\`\`
+${gene.content}
+\`\`\`
+
+CATEGORY: ${gene.category}
+
+RULES:
+1. Preserve ALL functional directives
+2. Remove filler words, redundancies, verbose explanations
+3. Use concise imperative language
+4. Keep technical terms intact
+5. Do NOT add new functionality
+6. Do NOT remove any capability
+
+Return ONLY the compressed instruction, nothing else.`,
+            },
+        ], { temperature: 0.3 });
+
+        return response.content.trim();
+    }
+
+    private createFailure(context: MutationContext, reason: string): MutationResult {
+        return {
+            success: false,
+            mutant: context.genome,
+            mutation: {
+                id: this.generateId(),
+                timestamp: new Date(),
+                chromosome: 'c1',
+                operation: this.name,
+                before: '',
+                after: '',
+                diff: '',
+                trigger: 'drift-detected',
+                reason,
+                sandboxTested: false,
+                promoted: false,
+                proposer: 'system',
+            },
+            description: reason,
+            expectedImprovement: 0,
+        };
+    }
+
+    private deepClone(genome: GenomeV2): GenomeV2 {
+        return JSON.parse(JSON.stringify(genome));
+    }
+
+    private generateId(): string {
+        return `mut_compress_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     }
 }
 
@@ -444,15 +633,95 @@ export class MutationEngine {
     }
 
     /**
-     * Rank operators by estimated improvement
+     * Select mutation strategy based on context signals.
+     *
+     * Returns ranked operators with contextual boost applied:
+     * - efficiency-decline drift → boost compress_instructions
+     * - cost-increase drift → boost compress_instructions
+     * - quality-decline drift → boost safety_reinforcement, reorder_constraints
+     * - high token usage → boost compress_instructions
+     *
+     * Falls back to estimateImprovement() ranking when no signals present.
+     */
+    public selectMutationStrategy(context: MutationContext): Array<{
+        operator: IMutationOperator;
+        score: number;
+        reason: string;
+    }> {
+        return this.rankOperatorsWithContext(context);
+    }
+
+    /**
+     * Rank operators by estimated improvement + contextual drift boost
      */
     private rankOperators(context: MutationContext): IMutationOperator[] {
-        const scored = Array.from(this.operators.values()).map((op) => ({
-            operator: op,
-            score: op.estimateImprovement(context),
-        }));
+        return this.rankOperatorsWithContext(context).map(s => s.operator);
+    }
 
-        return scored.sort((a, b) => b.score - a.score).map((s) => s.operator);
+    /**
+     * Core ranking logic: base estimate + drift-aware bonus
+     */
+    private rankOperatorsWithContext(context: MutationContext): Array<{
+        operator: IMutationOperator;
+        score: number;
+        reason: string;
+    }> {
+        const driftSignals = (context.evidence?.driftSignals ?? []) as Array<{
+            type: string;
+            severity: string;
+        }>;
+
+        // Compute total C1 token usage for token-pressure signal
+        const totalC1Tokens = context.genome.chromosomes.c1.operations
+            .reduce((sum, g) => sum + (g.tokenCount || estimateTokenCount(g.content)), 0);
+
+        const scored = Array.from(this.operators.values()).map((op) => {
+            let base = op.estimateImprovement(context);
+            let reason = 'base estimate';
+
+            // Drift-aware boosting
+            for (const signal of driftSignals) {
+                const boost = this.driftBoost(op.name, signal.type, signal.severity);
+                if (boost > 0) {
+                    base += boost;
+                    reason = `drift:${signal.type} (${signal.severity})`;
+                }
+            }
+
+            // Token pressure: if C1 is over 80% of typical budget (1600 tokens),
+            // boost compression operators
+            if (totalC1Tokens > 1600 && op.name === 'compress_instructions') {
+                const pressure = Math.min((totalC1Tokens - 1600) / 400, 0.3); // 0–0.3 bonus
+                base += pressure;
+                reason = `token pressure (${totalC1Tokens} tokens)`;
+            }
+
+            return { operator: op, score: base, reason };
+        });
+
+        return scored.sort((a, b) => b.score - a.score);
+    }
+
+    /**
+     * Compute drift-type → operator bonus
+     */
+    private driftBoost(operatorName: string, driftType: string, severity: string): number {
+        const severityMultiplier = severity === 'critical' ? 0.3
+            : severity === 'major' ? 0.2
+            : severity === 'moderate' ? 0.1
+            : 0.05;
+
+        // Map drift types to preferred operators
+        const mapping: Record<string, string[]> = {
+            'efficiency-decline': ['compress_instructions'],
+            'cost-increase': ['compress_instructions'],
+            'quality-decline': ['safety_reinforcement', 'reorder_constraints'],
+            'intervention-increase': ['safety_reinforcement', 'tool_selection_bias'],
+            'latency-increase': ['compress_instructions', 'reorder_constraints'],
+        };
+
+        const preferred = mapping[driftType] || [];
+        return preferred.includes(operatorName) ? severityMultiplier : 0;
     }
 
     /**

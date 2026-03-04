@@ -13,7 +13,7 @@
  * @version 2.0.0
  */
 
-import type { GenomeV2, Chromosome0, Chromosome1, Chromosome2 } from '@pga/core';
+import type { GenomeV2, Chromosome0, Chromosome1, Chromosome2 } from '@pga-ai/core';
 
 // ─── Template Configuration ─────────────────────────────────
 
@@ -325,7 +325,7 @@ Use when:
  *
  * @example
  * ```typescript
- * import { createCustomerSupportBot } from '@pga/templates';
+ * import { createCustomerSupportBot } from '@pga-ai/templates';
  *
  * const bot = await createCustomerSupportBot(pga, {
  *   companyName: 'Acme Corp',
@@ -397,15 +397,15 @@ export const USAGE_EXAMPLE = `
 
 ## 1. Install PGA
 \`\`\`bash
-npm install @pga/core @pga/adapters-llm-anthropic @pga/adapters-storage-postgres
+npm install @pga-ai/core @pga-ai/adapters-llm-anthropic @pga-ai/adapters-storage-postgres
 \`\`\`
 
 ## 2. Create Bot
 \`\`\`typescript
-import { PGA } from '@pga/core';
-import { ClaudeAdapter } from '@pga/adapters-llm-anthropic';
-import { PostgresAdapter } from '@pga/adapters-storage-postgres';
-import { createCustomerSupportBot } from '@pga/templates';
+import { PGA } from '@pga-ai/core';
+import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';
+import { PostgresAdapter } from '@pga-ai/adapters-storage-postgres';
+import { createCustomerSupportBot } from '@pga-ai/templates';
 
 const pga = new PGA({
   llm: new ClaudeAdapter({ apiKey: process.env.ANTHROPIC_API_KEY! }),
