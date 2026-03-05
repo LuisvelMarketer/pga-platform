@@ -7,7 +7,7 @@
  * @since 2025
  */
 
-import type { Genome, UserDNA, MutationLog } from '../types/index.js';
+import type { Genome, UserDNA, MutationLog, GeneRegistryEntry } from '../types/index.js';
 import type { SemanticFact } from '../memory/LayeredMemory.js';
 
 /**
@@ -142,4 +142,21 @@ export interface StorageAdapter {
      * Clean expired facts (returns count of deleted facts)
      */
     cleanExpiredFacts(userId: string, genomeId: string): Promise<number>;
+
+    // ─── Gene Registry (Cross-Genome Inheritance) ─────────
+
+    /**
+     * Save gene to family registry for cross-genome sharing
+     */
+    saveToGeneRegistry?(entry: GeneRegistryEntry): Promise<void>;
+
+    /**
+     * Query gene registry by family, gene name, and minimum fitness
+     */
+    queryGeneRegistry?(familyId: string, gene?: string, minFitness?: number): Promise<GeneRegistryEntry[]>;
+
+    /**
+     * Get the highest-fitness variant of a gene from the registry
+     */
+    getBestRegistryGene?(familyId: string, gene: string): Promise<GeneRegistryEntry | null>;
 }

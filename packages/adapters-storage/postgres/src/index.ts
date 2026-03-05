@@ -13,6 +13,7 @@ import type {
     Interaction,
     MutationLog,
     SemanticFact,
+    GeneRegistryEntry,
 } from '@pga-ai/core';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -671,6 +672,114 @@ export class PostgresAdapter implements StorageAdapter {
         );
 
         return result.rowCount || 0;
+    }
+
+    // ─── Gene Registry (Cross-Genome Inheritance) ─────────
+
+    /**
+     * Save gene to family registry for cross-genome sharing
+     */
+    async saveToGeneRegistry(entry: {
+        id: string;
+        familyId: string;
+        gene: string;
+        variant: string;
+        content: string;
+        layer: 0 | 1 | 2;
+        fitness: number;
+        sampleCount: number;
+        successRate: number;
+        metadata: Record<string, unknown>;
+        createdAt: Date;
+    }): Promise<void> {
+        await this.pool.query(
+            `INSERT INTO pga_gene_registry (id, family_id, gene, variant, content, layer, fitness, sample_count, success_rate, metadata, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             ON CONFLICT (id) DO UPDATE SET
+                fitness = EXCLUDED.fitness,
+                sample_count = EXCLUDED.sample_count,
+                success_rate = EXCLUDED.success_rate,
+                metadata = EXCLUDED.metadata`,
+            [
+                entry.id,
+                entry.familyId,
+                entry.gene,
+                entry.variant,
+                entry.content,
+                entry.layer,
+                entry.fitness,
+                entry.sampleCount,
+                entry.successRate,
+                JSON.stringify(entry.metadata),
+                entry.createdAt,
+            ],
+        );
+    }
+
+    /**
+     * Query gene registry by family, gene name, and minimum fitness
+     */
+    async queryGeneRegistry(familyId: string, gene?: string, minFitness?: number): Promise<GeneRegistryEntry[]> {
+        let query = 'SELECT * FROM pga_gene_registry WHERE family_id = $1';
+        const params: unknown[] = [familyId];
+        let paramIndex = 2;
+
+        if (gene) {
+            query += ` AND gene = $${paramIndex++}`;
+            params.push(gene);
+        }
+        if (minFitness !== undefined) {
+            query += ` AND fitness >= $${paramIndex++}`;
+            params.push(minFitness);
+        }
+
+        query += ' ORDER BY fitness DESC';
+
+        const result = await this.pool.query(query, params);
+
+        return result.rows.map((row: Record<string, unknown>) => this.mapRowToGeneRegistryEntry(row));
+    }
+
+    /**
+     * Get the highest-fitness variant of a gene from the registry
+     */
+    async getBestRegistryGene(familyId: string, gene: string): Promise<GeneRegistryEntry | null> {
+        const result = await this.pool.query(
+            `SELECT * FROM pga_gene_registry
+             WHERE family_id = $1 AND gene = $2
+             ORDER BY fitness DESC
+             LIMIT 1`,
+            [familyId, gene],
+        );
+
+        if (result.rows.length === 0) return null;
+
+        return this.mapRowToGeneRegistryEntry(result.rows[0] as Record<string, unknown>);
+    }
+
+    private mapRowToGeneRegistryEntry(row: Record<string, unknown>): GeneRegistryEntry {
+        const rawMetadata = typeof row.metadata === 'string'
+            ? JSON.parse(row.metadata)
+            : (row.metadata as Record<string, unknown>) || {};
+        return {
+            id: row.id as string,
+            familyId: row.family_id as string,
+            gene: row.gene as string,
+            variant: row.variant as string,
+            content: row.content as string,
+            layer: row.layer as 0 | 1 | 2,
+            fitness: parseFloat(row.fitness as string),
+            sampleCount: row.sample_count as number,
+            successRate: parseFloat(row.success_rate as string),
+            metadata: {
+                sourceGenomeId: (rawMetadata.sourceGenomeId as string) || '',
+                sourceVersion: (rawMetadata.sourceVersion as number) || 0,
+                publishedBy: (rawMetadata.publishedBy as string) || '',
+                description: rawMetadata.description as string | undefined,
+                tags: rawMetadata.tags as string[] | undefined,
+            },
+            createdAt: new Date(row.created_at as string),
+        };
     }
 
     /**

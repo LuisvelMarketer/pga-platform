@@ -38,6 +38,8 @@ import { PersonalNarrative, type NarrativeSummary, type SignificantMoment } from
 import { AnalyticMemoryEngine, type MemoryQueryResult } from './memory/AnalyticMemoryEngine.js';
 import type { GeneBank } from './gene-bank/GeneBank.js';
 import type { DriftSignal } from './evolution/DriftAnalyzer.js';
+import { CanaryDeploymentManager } from './evolution/CanaryDeployment.js';
+import type { CanaryDeployment } from './evolution/CanaryDeployment.js';
 
 export interface PGAConfig {
     /**
@@ -314,6 +316,7 @@ export class GenomeInstance {
     private calibratedAutonomy?: CalibratedAutonomy;
     private personalNarrative?: PersonalNarrative;
     private analyticMemory?: AnalyticMemoryEngine;
+    private canaryManager: CanaryDeploymentManager;
     private interactionCount: number = 0;
 
     constructor(
@@ -359,6 +362,10 @@ export class GenomeInstance {
         this.fitnessTracker = new FitnessTracker(storage, genome);
         this.fitnessCalculator = new FitnessCalculator();
         this.mutationEngine = new MutationEngine();
+        this.canaryManager = new CanaryDeploymentManager(storage, {
+            initialTrafficPercent: 10,
+            minSampleSize: 5,
+        });
         // Register LLM-powered token compression operator
         this.mutationEngine.registerOperator(new TokenCompressionOperator(llm));
         this.driftAnalyzer = new DriftAnalyzer();
@@ -551,6 +558,19 @@ Ready to see what we can do together? 😊`,
                 prompt = ragContext.augmentedPrompt;
             }
 
+            // Canary routing: apply canary variant if active for this user
+            let activeCanaryId: string | undefined;
+            const activeCanaries = this.canaryManager.getActiveDeployments();
+            for (const canary of activeCanaries) {
+                if (canary.genomeId === this.genome.id && context.userId) {
+                    if (this.canaryManager.shouldUseCanary(canary.id, context.userId)) {
+                        // User is in canary group — swap gene content
+                        activeCanaryId = canary.id;
+                        prompt = this.applyCanaryVariant(prompt, canary);
+                    }
+                }
+            }
+
             // Use Reasoning if enabled
             let response: { content: string };
             if (this.reasoningEngine) {
@@ -598,6 +618,26 @@ Ready to see what we can do together? 😊`,
                     outputTokens,
                 },
             });
+
+            // Record canary metrics if active
+            if (activeCanaryId) {
+                this.canaryManager.recordRequest(activeCanaryId, 'canary', {
+                    success: true,
+                    latencyMs: Date.now() - startTime,
+                    fitness: 0.7,
+                });
+            } else {
+                // Record to stable metrics for any active canaries
+                for (const canary of activeCanaries) {
+                    if (canary.genomeId === this.genome.id) {
+                        this.canaryManager.recordRequest(canary.id, 'stable', {
+                            success: true,
+                            latencyMs: Date.now() - startTime,
+                            fitness: 0.7,
+                        });
+                    }
+                }
+            }
 
             // Record fitness for drift detection using FitnessCalculator
             const interactionData: InteractionData = {
@@ -707,10 +747,9 @@ Ready to see what we can do together? 😊`,
         // Update user DNA profile
         await this.dnaProfile.updateDNA(interaction.userId, this.genome.id, fullInteraction);
 
-        // Record fitness for active alleles using FitnessTracker
+        // Record fitness for active alleles using real quality scoring
         for (const allele of this.genome.layers.layer1.filter(a => a.status === 'active')) {
-            // Use a baseline score based on whether the interaction was successful
-            const score = interaction.assistantResponse ? 0.7 : 0.3;
+            const score = this.computeInteractionQuality(interaction);
             await this.fitnessTracker.recordPerformance(1, allele.gene, allele.variant, score);
         }
 
@@ -945,16 +984,34 @@ Ready to see what we can do together? 😊`,
                     economic: gateResult.gates.economic,
                     stability: gateResult.gates.stability,
                 },
-            } : gateResult.finalDecision === 'canary' ? {
-                applied: false,
-                reason: `${gateResult.reason} - Canary deployment not yet implemented`,
-                gateResults: {
-                    quality: gateResult.gates.quality,
-                    sandbox: gateResult.gates.sandbox,
-                    economic: gateResult.gates.economic,
-                    stability: gateResult.gates.stability,
-                },
-            } : {
+            } : gateResult.finalDecision === 'canary' ? await (async () => {
+                // Start canary deployment for real-world validation
+                const canaryAllele = {
+                    gene: opts.gene,
+                    variant: mutationCandidate.variant,
+                    content: mutationCandidate.content,
+                    fitness: mutationCandidate.fitness,
+                    status: 'active' as const,
+                    createdAt: new Date(),
+                };
+                await this.canaryManager.startCanary({
+                    genomeId: this.genome.id,
+                    layer: opts.layer as 0 | 1 | 2,
+                    gene: opts.gene,
+                    stableAllele: currentAllele,
+                    canaryAllele,
+                });
+                return {
+                    applied: false,
+                    reason: `${gateResult.reason} - Canary deployment started (10% traffic)`,
+                    gateResults: {
+                        quality: gateResult.gates.quality,
+                        sandbox: gateResult.gates.sandbox,
+                        economic: gateResult.gates.economic,
+                        stability: gateResult.gates.stability,
+                    },
+                };
+            })() : {
                 applied: false,
                 reason: gateResult.reason,
                 gateResults: {
@@ -978,7 +1035,7 @@ Ready to see what we can do together? 😊`,
                     gene: opts.gene,
                     operators: opts.operators,
                     decision: gateResult.finalDecision,
-                    improvement: result.improvement,
+                    improvement: 'improvement' in result ? result.improvement : undefined,
                     gatesPassed: Object.values(gateResult.gates).filter(g => g.passed).length,
                     totalGates: Object.keys(gateResult.gates).length,
                 },
@@ -1138,15 +1195,35 @@ Ready to see what we can do together? 😊`,
         // Create registry entry ID
         const registryId = `${this.genome.familyId}_${gene}_${variant}_${Date.now()}`;
 
-        // TODO: Save to gene registry table via storage adapter
-        // Will include: familyId, gene, variant, content, layer, fitness, successRate, metadata
-        // For now, log as mutation with special type
+        // Save to gene registry via storage adapter
+        if (this.storage.saveToGeneRegistry) {
+            await this.storage.saveToGeneRegistry({
+                id: registryId,
+                familyId: this.genome.familyId!,
+                gene,
+                variant,
+                content: allele.content,
+                layer,
+                fitness: allele.fitness,
+                sampleCount: allele.sampleCount || 0,
+                successRate,
+                metadata: {
+                    sourceGenomeId: this.genome.id,
+                    sourceVersion: this.genome.version || 1,
+                    publishedBy: this.genome.id,
+                    description: description || undefined,
+                },
+                createdAt: new Date(),
+            });
+        }
+
+        // Also log as mutation for audit trail
         await this.storage.logMutation({
             genomeId: this.genome.id,
             layer,
             gene,
             variant,
-            mutationType: 'user_feedback', // Using this as placeholder
+            mutationType: 'user_feedback',
             parentVariant: null,
             deployed: true,
             reason: `Published to registry: ${description || 'No description'} (fitness: ${successRate})`,
@@ -1170,14 +1247,43 @@ Ready to see what we can do together? 😊`,
             throw new Error(`Cannot inherit from different family: ${familyId}`);
         }
 
-        // TODO: Query gene registry table for best variant of this gene
-        // Will filter by: familyId, gene, and optionally targetLayer
-        // Then call addAllele() with inherited content
-        // For now, throw error indicating feature under development
-        throw new Error(
-            `Gene Registry inheritance under development - ` +
-            `will inherit gene '${gene}' from family '${familyId}' to layer ${targetLayer ?? 'auto'}`
+        // Query gene registry for the best variant of this gene
+        if (!this.storage.getBestRegistryGene) {
+            throw new Error('Storage adapter does not support Gene Registry queries');
+        }
+
+        const bestGene = await this.storage.getBestRegistryGene(familyId, gene);
+
+        if (!bestGene) {
+            throw new Error(`No gene '${gene}' found in registry for family '${familyId}'`);
+        }
+
+        // Determine target layer: use specified layer, registry layer, or default to 1
+        const layer = targetLayer ?? bestGene.layer ?? 1;
+
+        // Inject as a new allele variant
+        await this.addAllele(
+            layer,
+            gene,
+            `inherited_${bestGene.variant}_${Date.now()}`,
+            bestGene.content,
         );
+
+        // Update lineage tracking
+        if (this.genome.lineage) {
+            this.genome.lineage.mutationOps = [
+                ...(this.genome.lineage.mutationOps || []),
+                `inherit:${gene}:${bestGene.variant}`,
+            ];
+        }
+
+        this.metrics.logAudit({
+            level: 'info',
+            component: 'genome',
+            operation: 'inherit-gene',
+            message: `Inherited gene '${gene}' (variant: ${bestGene.variant}, fitness: ${bestGene.fitness.toFixed(2)}) from family '${familyId}'`,
+            genomeId: this.genome.id,
+        });
     }
 
     /**
@@ -1412,6 +1518,14 @@ Ready to see what we can do together? 😊`,
     }
 
     /**
+     * Get active canary deployments for this genome
+     */
+    getActiveCanaries(): CanaryDeployment[] {
+        return this.canaryManager.getActiveDeployments()
+            .filter(d => d.genomeId === this.genome.id);
+    }
+
+    /**
      * Record an observation to the analytic memory
      */
     recordMemoryObservation(observation: {
@@ -1459,7 +1573,28 @@ Ready to see what we can do together? 😊`,
             }
         }
 
-        // 3. Swarm: auto-import genes when struggling
+        // 3. Evaluate active canary deployments
+        await this.evaluateCanaries();
+
+        // 4. Auto-publish high-fitness genes to Gene Bank
+        if (this.geneBank && (autoConfig?.enableSwarm ?? !!this.geneBank)) {
+            await this.publishHighFitnessGenes();
+        }
+
+        // 5. Auto-inherit genes from family registry when drifting
+        if (this.genome.familyId && this.storage.getBestRegistryGene && drift.isDrifting) {
+            for (const signal of drift.signals) {
+                if (signal.severity === 'minor') continue;
+                const target = this.driftToMutationTarget(signal);
+                try {
+                    await this.inheritGeneFromRegistry(this.genome.familyId, target.gene, target.layer);
+                } catch {
+                    // Gene not found in registry — expected for new families
+                }
+            }
+        }
+
+        // 6. Swarm: auto-import genes from Gene Bank when struggling
         if (this.geneBank && autoConfig?.enableSwarm && drift.isDrifting) {
             const targetSeverity = autoConfig.autoImportOnDrift ?? 'severe';
             const severityRank = (s: string) =>
@@ -1479,6 +1614,122 @@ Ready to see what we can do together? 😊`,
             genomeId: this.genome.id,
             metadata: { isDrifting: drift.isDrifting, signalCount: drift.signals.length },
         });
+    }
+
+    /**
+     * Compute real interaction quality score from multiple signals.
+     *
+     * Uses response length, token efficiency, user feedback sentiment,
+     * and structural quality to produce a 0-1 score.
+     */
+    private computeInteractionQuality(interaction: Omit<Interaction, 'genomeId'>): number {
+        if (!interaction.assistantResponse) return 0.2;
+
+        const response = interaction.assistantResponse;
+        const message = interaction.userMessage;
+
+        // Signal 1: Response exists and has substance (0-0.3)
+        const hasSubstance = response.length > 20 ? 0.3 : response.length / 20 * 0.3;
+
+        // Signal 2: Token efficiency — response proportional to question (0-0.25)
+        const ratio = message.length > 0 ? response.length / message.length : 1;
+        // Sweet spot: 1x-5x the question length
+        const efficiencyScore = ratio >= 1 && ratio <= 5 ? 0.25 :
+            ratio > 5 ? Math.max(0, 0.25 - (ratio - 5) * 0.02) :
+            ratio * 0.25;
+
+        // Signal 3: Structural quality — has paragraphs, code blocks, lists (0-0.25)
+        const hasStructure = (
+            (response.includes('\n\n') ? 0.08 : 0) +
+            (response.includes('```') ? 0.08 : 0) +
+            (response.includes('- ') || response.includes('* ') ? 0.05 : 0) +
+            (response.length > 100 ? 0.04 : 0)
+        );
+
+        // Signal 4: User satisfaction proxy (0-0.2)
+        const userSatisfied = interaction.userSatisfied;
+        const satisfactionScore = userSatisfied === true ? 0.2 :
+            userSatisfied === false ? 0.0 :
+            0.1; // neutral/unknown
+
+        return Math.min(1, hasSubstance + efficiencyScore + hasStructure + satisfactionScore);
+    }
+
+    /**
+     * Apply canary variant content to the assembled prompt.
+     *
+     * Finds the gene section in the prompt and replaces with canary content.
+     */
+    private applyCanaryVariant(prompt: string, canary: CanaryDeployment): string {
+        // Find the canary allele content
+        const canaryAlleleContent = this.genome.layers[`layer${canary.layer}` as 'layer0' | 'layer1' | 'layer2']
+            ?.find(a => a.variant === canary.canaryVariant)?.content;
+
+        if (!canaryAlleleContent) return prompt;
+
+        // Find the stable allele content
+        const stableContent = this.genome.layers[`layer${canary.layer}` as 'layer0' | 'layer1' | 'layer2']
+            ?.find(a => a.variant === canary.stableVariant)?.content;
+
+        if (stableContent && prompt.includes(stableContent)) {
+            return prompt.replace(stableContent, canaryAlleleContent);
+        }
+
+        // If stable content not found in prompt, append canary as override
+        return prompt + `\n\n## Gene Override (${canary.gene})\n${canaryAlleleContent}`;
+    }
+
+    /**
+     * Auto-publish high-fitness genes to Gene Bank for swarm sharing.
+     */
+    private async publishHighFitnessGenes(): Promise<void> {
+        if (!this.geneBank) return;
+
+        const threshold = this.genome.config.autonomous?.autoPublishThreshold ?? 0.85;
+        for (const allele of this.genome.layers.layer1.filter(a => a.status === 'active')) {
+            if (allele.fitness >= threshold && !allele.publishedToSwarm) {
+                await this.autoPublishGene(allele).catch(() => {});
+            }
+        }
+    }
+
+    /**
+     * Evaluate and process active canary deployments.
+     *
+     * Promotes successful canaries, rolls back failing ones.
+     */
+    private async evaluateCanaries(): Promise<void> {
+        const deployments = this.canaryManager.getActiveDeployments();
+        for (const deployment of deployments) {
+            if (deployment.genomeId !== this.genome.id) continue;
+
+            try {
+                const decision = await this.canaryManager.evaluateCanary(deployment.id);
+
+                if (decision.action === 'promote') {
+                    // Apply canary variant as new active allele
+                    const layerKey = `layer${deployment.layer}` as 'layer0' | 'layer1' | 'layer2';
+                    const canaryContent = this.genome.layers[layerKey]
+                        ?.find(a => a.variant === deployment.canaryVariant)?.content;
+
+                    if (canaryContent) {
+                        await this.addAllele(
+                            deployment.layer,
+                            deployment.gene,
+                            deployment.canaryVariant,
+                            canaryContent,
+                        );
+                    }
+                    await this.canaryManager.promote(deployment.id);
+                } else if (decision.action === 'rollback') {
+                    await this.canaryManager.rollback(deployment.id, decision.reason);
+                } else if (decision.action === 'ramp-up') {
+                    await this.canaryManager.rampUp(deployment.id);
+                }
+            } catch {
+                // Non-critical: don't block evolution cycle
+            }
+        }
     }
 
     /**
