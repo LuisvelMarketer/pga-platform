@@ -1,0 +1,39 @@
+{
+  "name": "@pga-ai/server",
+  "version": "0.1.0",
+  "description": "PGA Evolution Server — Secure Pull/Push API for external agents",
+  "author": "Luis Alfredo Velasquez Duran <contact@pgacore.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pga-ai/core": "*",
+    "fastify": "^5.3.3",
+    "@fastify/rate-limit": "^10.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^3.2.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

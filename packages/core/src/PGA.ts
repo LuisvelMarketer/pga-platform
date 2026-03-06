@@ -953,6 +953,107 @@ Ready to see what we can do together? 😊`,
     }
 
     /**
+     * Report metrics from an external interaction (Pull/Push model).
+     *
+     * Used by PGA Server to feed metrics from agents that call LLMs directly.
+     * PGA never sees the actual content — only numeric metrics flow in.
+     *
+     * Triggers the same fitness + evolution pipeline as chat():
+     * MetricsCollector → FitnessCalculator → DriftAnalyzer → Evolution
+     */
+    async reportExternalMetrics(metrics: {
+        userId?: string;
+        success: boolean;
+        latencyMs: number;
+        inputTokens: number;
+        outputTokens: number;
+        taskType?: string;
+        quality?: number;
+        feedback?: 'positive' | 'negative' | 'neutral';
+    }): Promise<void> {
+        const requestId = `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // 1. Record to MetricsCollector
+        this.metrics.recordRequest({
+            requestId,
+            duration: metrics.latencyMs,
+            success: metrics.success,
+            model: 'external',
+            inputTokens: metrics.inputTokens,
+            outputTokens: metrics.outputTokens,
+            ...(metrics.success ? {} : { error: 'external-failure' }),
+        });
+
+        // 2. Audit log
+        this.metrics.logAudit({
+            level: 'info',
+            component: 'genome',
+            operation: 'external-report',
+            message: `External metrics reported: ${metrics.success ? 'success' : 'failure'}`,
+            userId: metrics.userId,
+            genomeId: this.genome.id,
+            duration: metrics.latencyMs,
+            metadata: {
+                inputTokens: metrics.inputTokens,
+                outputTokens: metrics.outputTokens,
+                taskType: metrics.taskType,
+            },
+        });
+
+        // 3. Compute fitness via FitnessCalculator
+        const quality = metrics.quality ?? (metrics.success ? 0.7 : 0.3);
+        const interactionData: InteractionData = {
+            success: metrics.success,
+            quality,
+            inputTokens: metrics.inputTokens,
+            outputTokens: metrics.outputTokens,
+            latency: metrics.latencyMs,
+            model: 'external',
+            interventionNeeded: false,
+            timestamp: new Date(),
+        };
+        const fitnessVector = this.fitnessCalculator.computeFitness([interactionData]);
+
+        // 4. Record fitness to DriftAnalyzer
+        this.driftAnalyzer.recordFitness(fitnessVector);
+
+        // 5. Enhanced Self-Model: record capability if taskType provided
+        if (this.enhancedSelfModel && metrics.taskType) {
+            for (const allele of this.genome.layers.layer1.filter(a => a.status === 'active')) {
+                this.enhancedSelfModel.recordCapability(metrics.taskType, allele.gene, quality);
+            }
+        }
+
+        // 6. Purpose Survival: evaluate threats
+        if (this.purposeSurvival) {
+            this.purposeSurvival.evaluateThreats();
+        }
+
+        // 7. Continuous Evolution Loop
+        this.interactionCount++;
+        const autoConfig = this.genome.config.autonomous;
+        if (autoConfig?.continuousEvolution && this.interactionCount % (autoConfig.evolveEveryN ?? 10) === 0) {
+            this.runEvolutionCycle().catch(err =>
+                this.metrics.logAudit({
+                    level: 'warning',
+                    component: 'genome',
+                    operation: 'auto-evolve',
+                    message: `Auto-evolution failed: ${err instanceof Error ? err.message : String(err)}`,
+                    genomeId: this.genome.id,
+                })
+            );
+        }
+
+        // 8. Record feedback if provided
+        if (metrics.feedback && metrics.userId) {
+            const activeGenes = this.genome.layers.layer1.filter(a => a.status === 'active');
+            for (const allele of activeGenes) {
+                await this.recordFeedback(metrics.userId, allele.gene, metrics.feedback);
+            }
+        }
+    }
+
+    /**
      * Get user DNA profile
      */
     async getDNA(userId: string) {
