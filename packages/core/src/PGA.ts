@@ -10,6 +10,8 @@
 import type { LLMAdapter } from './interfaces/LLMAdapter.js';
 import type { StorageAdapter } from './interfaces/StorageAdapter.js';
 import type { Genome, GenomeConfig, SelectionContext, Interaction, EvolutionGuardrails } from './types/index.js';
+import { WrappedAgent } from './wrap/WrappedAgent.js';
+import type { WrapOptions, FunctionWrapOptions } from './wrap/WrapOptions.js';
 import { GenomeManager } from './core/GenomeManager.js';
 import { PromptAssembler } from './core/PromptAssembler.js';
 import { DNAProfile } from './core/DNAProfile.js';
@@ -116,6 +118,37 @@ export class PGA {
     private dashboard?: MonitoringDashboard;
 
     constructor(private pgaConfig: PGAConfig) {
+        // ─── LLM Validation ────────────────────────────────────
+        if (!pgaConfig.llm) {
+            throw new Error(
+                `[PGA] LLM adapter is required.\n\n`
+                + `PGA needs an AI model to function. Please provide an LLM adapter:\n\n`
+                + `  import { PGA } from '@pga-ai/core';\n`
+                + `  import { ClaudeAdapter } from '@pga-ai/adapters-llm-anthropic';\n\n`
+                + `  const pga = new PGA({\n`
+                + `    llm: new ClaudeAdapter({ apiKey: process.env.ANTHROPIC_API_KEY }),\n`
+                + `    storage: yourStorageAdapter,\n`
+                + `  });\n\n`
+                + `Supported adapters:\n`
+                + `  - @pga-ai/adapters-llm-anthropic (Claude)\n`
+                + `  - @pga-ai/adapters-llm-openai (GPT-4)\n\n`
+                + `Run 'pga doctor' for full diagnostics.`,
+            );
+        }
+
+        if (!pgaConfig.storage) {
+            throw new Error(
+                `[PGA] Storage adapter is required.\n\n`
+                + `PGA needs a storage adapter to persist genomes. Please provide one:\n\n`
+                + `  import { InMemoryStorage } from '@pga-ai/core';\n\n`
+                + `  const pga = new PGA({\n`
+                + `    llm: yourLLMAdapter,\n`
+                + `    storage: new InMemoryStorage(),\n`
+                + `  });\n\n`
+                + `For production, use: @pga-ai/adapters-storage-postgres`,
+            );
+        }
+
         this.llm = pgaConfig.llm;
         this.genomeManager = new GenomeManager(pgaConfig.storage);
 
@@ -294,6 +327,45 @@ export class PGA {
      */
     async deleteGenome(genomeId: string): Promise<void> {
         await this.genomeManager.deleteGenome(genomeId);
+    }
+
+    /**
+     * Wrap ANY existing LLM adapter or function to make it self-evolving.
+     *
+     * Zero migration cost — works with existing adapters or raw functions.
+     * Automatically creates a genome, monitors performance, and evolves.
+     *
+     * @example Level 1: Wrap an LLMAdapter
+     * ```typescript
+     * const agent = await PGA.wrap(myClaudeAdapter, {
+     *   systemPrompt: "You are a helpful assistant...",
+     *   protect: ['Never share user data'],
+     *   evolve: ['tool-usage', 'reasoning'],
+     *   adapt: ['tone', 'verbosity'],
+     * });
+     * const response = await agent.chat(messages);
+     * ```
+     *
+     * @example Level 2: Wrap a function
+     * ```typescript
+     * const agent = await PGA.wrap(async (input) => {
+     *   return await myAgent.run(input);
+     * }, { name: 'my-agent', systemPrompt: '...' });
+     * const result = await agent.execute("help me debug this");
+     * ```
+     */
+    static async wrap(
+        target: LLMAdapter | ((input: string) => Promise<string>),
+        options: WrapOptions | FunctionWrapOptions,
+    ): Promise<WrappedAgent> {
+        if (typeof target === 'function') {
+            if (!options.name) {
+                throw new Error('PGA.wrap(): name is required when wrapping a function');
+            }
+            return WrappedAgent.fromFunction(target, options as FunctionWrapOptions);
+        }
+
+        return WrappedAgent.fromAdapter(target as LLMAdapter, options);
     }
 }
 
@@ -590,6 +662,13 @@ Ready to see what we can do together? 😊`,
      * Chat with PGA optimization + Intelligence Boost + Auto Monitoring
      */
     async chat(userMessage: string, context: SelectionContext): Promise<string> {
+        if (!this.llm) {
+            throw new Error(
+                `[PGA] Cannot chat: no LLM adapter configured. `
+                + `The agent needs an AI model to generate responses.`,
+            );
+        }
+
         const requestId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const startTime = Date.now();
         let error: string | undefined;
@@ -938,6 +1017,11 @@ Ready to see what we can do together? 😊`,
      * Trigger advanced mutation cycle with operators + Auto Monitoring
      *
      * Living OS v1.0 Must-Have: Multi-gate promotion with economic validation
+     *
+     * Note: Mutation works without LLM for mechanical operators (compress,
+     * reorder, safety, tool_selection_bias). LLM-powered operators
+     * (semantic_restructuring, pattern_extraction, crossover_mutation,
+     * breakthrough) will gracefully fallback if LLM is unavailable.
      */
     async mutate(options?: {
         operators?: string[];

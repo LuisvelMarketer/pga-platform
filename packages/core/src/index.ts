@@ -28,6 +28,14 @@
 export { PGA, GenomeInstance } from './PGA.js';
 export type { PGAConfig } from './PGA.js';
 
+// ─── Wrap (Universal Middleware) ────────────────────────
+
+export { WrappedAgent } from './wrap/WrappedAgent.js';
+export { GenomeBuilder } from './wrap/GenomeBuilder.js';
+export { InMemoryStorageAdapter } from './wrap/InMemoryStorageAdapter.js';
+export { FunctionLLMAdapter } from './wrap/FunctionLLMAdapter.js';
+export type { WrapOptions, FunctionWrapOptions, WrappableFunction } from './wrap/WrapOptions.js';
+
 // ─── Evaluation ─────────────────────────────────────────
 
 export { Evaluator, STANDARD_TASKS } from './evaluation/Evaluator.js';

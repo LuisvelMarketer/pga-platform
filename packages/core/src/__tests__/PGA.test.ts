@@ -87,6 +87,45 @@ describe('PGA', () => {
         storage = new MockStorageAdapter();
     });
 
+    describe('validation', () => {
+        it('should throw descriptive error when LLM adapter is missing', () => {
+            expect(() => new PGA({
+                llm: undefined as any,
+                storage,
+            })).toThrow('[PGA] LLM adapter is required');
+        });
+
+        it('should throw descriptive error when LLM adapter is null', () => {
+            expect(() => new PGA({
+                llm: null as any,
+                storage,
+            })).toThrow('[PGA] LLM adapter is required');
+        });
+
+        it('should throw descriptive error when storage adapter is missing', () => {
+            expect(() => new PGA({
+                llm,
+                storage: undefined as any,
+            })).toThrow('[PGA] Storage adapter is required');
+        });
+
+        it('should include actionable instructions in error message', () => {
+            try {
+                new PGA({ llm: undefined as any, storage });
+                expect.unreachable('Should have thrown');
+            } catch (e) {
+                const msg = (e as Error).message;
+                expect(msg).toContain('ClaudeAdapter');
+                expect(msg).toContain('@pga-ai/adapters-llm-anthropic');
+                expect(msg).toContain('pga doctor');
+            }
+        });
+
+        it('should succeed with valid LLM and storage', () => {
+            expect(() => new PGA({ llm, storage })).not.toThrow();
+        });
+    });
+
     describe('initialization', () => {
         it('should initialize PGA with default monitoring config', async () => {
             const pga = new PGA({
